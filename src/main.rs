@@ -1,53 +1,56 @@
-#[macro_use] extern crate diesel;
-#[macro_use] extern crate diesel_codegen;
+#[macro_use]
+extern crate diesel;
+#[macro_use]
+extern crate diesel_codegen;
 extern crate chrono;
-extern crate serde;
-extern crate serde_json;
 extern crate dotenv;
-
-use diesel::prelude::*;
-use diesel::pg::PgConnection;
-use dotenv::dotenv;
-use std::env;
+#[macro_use]
+extern crate error_chain;
 
 pub mod models;
 pub mod schema;
+pub mod utils;
 
-use models::*;
-
-pub fn establish_connection() -> PgConnection {
-    dotenv().ok();
-
-    let database_url = env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set");
-    PgConnection::establish(&database_url)
-        .expect(&format!("Error connecting to {}", database_url))
-}
-
-fn main() {
-    use schema::checks::dsl::*;
-
-    let connection = establish_connection();
-    create_check(&connection, "google.com", 60);
-    let results = checks.limit(5)
-        .load::<Check>(&connection)
-        .expect("Error loading posts");
-
-    println!("Displaying {} checks", results.len());
-    for check in results {
-        println!("{}, {}", check.id, check.url);
+mod fdw_error {
+    error_chain! {
+        foreign_links {
+            Diesel(::diesel::result::Error);
+        }
     }
 }
 
-fn create_check<'a>(conn: &PgConnection, url: &'a str, rate: i32) -> Check {
-    use schema::checks;
+fn main() {}
 
-    let new_check = NewCheck {
-        url: url,
-        rate: rate,
-    };
+#[cfg(test)]
+mod tests {
+    use models::{Check, NewCheck};
+    use utils::establish_connection;
 
-    diesel::insert(&new_check).into(checks::table)
-        .get_result(conn)
-        .expect("Error saving new post")
+    #[test]
+    fn test_dsl() {
+        let connection = establish_connection();
+        let check = NewCheck { url: "google.com", rate: 60 };
+        let inserted = check.insert(&connection);
+
+        let mut selected = Check::get(inserted.id, &connection).unwrap();
+
+        assert_eq!(inserted, selected);
+
+        let updated = selected.update_state(String::from("updated"), &connection).unwrap();
+
+        let updated_in_db = Check::get(inserted.id, &connection).unwrap();
+
+        assert_ne!(inserted, updated);
+        assert_eq!(updated, updated_in_db);
+        assert_eq!(updated.state, Some(String::from("updated")));
+
+        let affected = updated.delete(&connection);
+        assert_eq!(affected.unwrap(), 1);
+
+        match Check::get(inserted.id, &connection) {
+            Ok(_) => unreachable!(),
+            Err(_) => assert!(true)
+        };
+    }
 }
+
