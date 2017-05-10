@@ -1,0 +1,13 @@
+[package]
+name = "ringer"
+version = "0.1.0"
+authors = ["Drazen Urch <github@drazenur.ch>"]
+
+[dependencies]
+chrono = "*"
+serde = "*"
+serde_json = "*"
+diesel = { version = "^0.12", features = ["postgres" , "chrono", "serde_json"] }
+diesel_codegen = { version = "^0.12", features = ["postgres"] }
+
+dotenv = "0.8.0"
