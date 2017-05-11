@@ -22,6 +22,10 @@ pub struct Check {
 
 
 impl Check {
+    pub fn exists(url: &str) -> Result<Self> {
+        Ok(checks::table.filter(checks::url.eq(url)).get_result(&establish_connection())?)
+    }
+
     pub fn get_all() -> Result<Vec<Self>> {
         Ok(checks::table.load(&establish_connection())?)
     }
@@ -127,5 +131,12 @@ impl NewCheck {
             .into(checks::table)
             .get_result(&establish_connection())
             .expect("Error saving new check")
+    }
+
+    pub fn insert_if_url_not_exists(&self) -> Check {
+        match Check::exists(&self.url) {
+            Ok(check) => check,
+            Err(_) => self.insert()
+        }
     }
 }
