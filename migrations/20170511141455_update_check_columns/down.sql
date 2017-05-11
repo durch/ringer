@@ -1,0 +1,1 @@
+ALTER TABLE checks DROP COLUMN check_finished;

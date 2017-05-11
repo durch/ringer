@@ -1,0 +1,1 @@
+ALTER TABLE checks ADD COLUMN check_finished TIMESTAMP WITH TIME ZONE;

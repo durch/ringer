@@ -9,3 +9,4 @@ diesel = { version = "^0.12", features = ["postgres" , "chrono"] }
 diesel_codegen = { version = "^0.12", features = ["postgres"] }
 dotenv = "^0.10"
 error-chain = "*"
+curl = "*"
