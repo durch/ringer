@@ -22,6 +22,10 @@ pub struct Check {
 
 
 impl Check {
+    pub fn get_all() -> Result<Vec<Self>> {
+        Ok(checks::table.load(&establish_connection())?)
+    }
+
     pub fn u_state(&mut self, new_state: String) -> Result<Self> {
         self.state = Some(new_state);
         Ok(self.save_changes::<Self>(&establish_connection())?)
@@ -53,6 +57,14 @@ impl Check {
                .first::<Self>(&establish_connection())?)
     }
 
+    pub fn conditional_perform(&mut self) -> Result<()> {
+        if self.rate <= self.duration_since_last_end() {
+            println!("{} - Running check : {}", UTC::now(), self.url);
+            self.perform()?
+        }
+        Ok(())
+    }
+
     pub fn perform(&mut self) -> Result<()> {
         let mut easy = Easy::new();
         let mut dst = Vec::new();
@@ -75,6 +87,14 @@ impl Check {
 
     pub fn valid(&self) -> bool {
         self.last_start < self.last_end
+    }
+
+    pub fn duration_since_last_end(&self) -> i32 {
+        match self.last_end {
+            Some(x) => UTC::now().naive_utc().signed_duration_since(x).num_seconds() as i32,
+            None => ::std::i32::MAX
+        }
+        
     }
 }
 

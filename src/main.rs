@@ -12,7 +12,10 @@ pub mod models;
 pub mod schema;
 pub mod utils;
 
-use models::{NewCheck, Check};
+use chrono::prelude::*;
+use models::{Check, NewCheck};
+
+use std::{thread, time};
 
 mod fdw_error {
     error_chain! {
@@ -24,9 +27,24 @@ mod fdw_error {
     }
 }
 
+use fdw_error::Result;
 
+fn sample_run() -> Result<()> {
+    let mut checks;
+    loop {
+        checks = Check::get_all()?;
+        for mut check in checks {
+            let _ = check.conditional_perform();
+        }
+        thread::sleep(time::Duration::from_secs(10))
+    }
+}
 
-fn main() {}
+fn main() {
+    let adex = NewCheck {url: String::from("https://adex.cloud"), rate: 60};
+    let adex_check = adex.insert();
+    let _ = sample_run();
+}
 
 #[cfg(test)]
 mod tests {
