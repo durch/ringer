@@ -58,7 +58,7 @@ mod tests {
 
         assert_eq!(inserted, selected);
 
-        let updated = selected.update_state(String::from("updated")).unwrap();
+        let updated = selected.u_state(String::from("updated")).unwrap();
 
         let updated_in_db = Check::get(inserted.id).unwrap();
 

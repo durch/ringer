@@ -2,6 +2,8 @@ CREATE TABLE checks (
   id SERIAL PRIMARY KEY,
   url TEXT NOT NULL ,
   rate INTEGER NOT NULL ,
-  last_checked TIMESTAMP WITH TIME ZONE,
+  last_start TIMESTAMP WITH TIME ZONE,
+  last_end TIMESTAMP WITH TIME ZONE,
+  http_status INTEGER,
   state TEXT
 );
