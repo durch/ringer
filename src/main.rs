@@ -49,7 +49,7 @@ fn sample_run() -> Result<()> {
 
 fn main() {
     let adex = NewCheck {
-        url: String::from("https://adex.cloud"),
+        url: String::from("https://w.adex.cloud"),
         rate: 60,
     };
     let _ = adex.insert_if_url_not_exists();

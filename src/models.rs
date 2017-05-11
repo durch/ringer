@@ -23,7 +23,9 @@ pub struct Check {
 
 impl Check {
     pub fn exists(url: &str) -> Result<Self> {
-        Ok(checks::table.filter(checks::url.eq(url)).get_result(&establish_connection())?)
+        Ok(checks::table
+               .filter(checks::url.eq(url))
+               .get_result(&establish_connection())?)
     }
 
     pub fn get_all() -> Result<Vec<Self>> {
@@ -63,7 +65,6 @@ impl Check {
 
     pub fn conditional_perform(&mut self) -> Result<()> {
         if self.rate <= self.duration_since_last_end() {
-            println!("{} - Running check : {}", UTC::now(), self.url);
             self.perform()?
         }
         Ok(())
@@ -86,6 +87,7 @@ impl Check {
         let _ = self.u_last_end(UTC::now().naive_utc());
         let _ = self.u_state(String::from_utf8(dst)?);
         let _ = self.u_http_status(easy.response_code()?);
+        println!("{} - Ran check : {} - {}", UTC::now(), self.url, self.http_status.unwrap_or(418));
         return Ok(());
     }
 
@@ -95,10 +97,15 @@ impl Check {
 
     pub fn duration_since_last_end(&self) -> i32 {
         match self.last_end {
-            Some(x) => UTC::now().naive_utc().signed_duration_since(x).num_seconds() as i32,
-            None => ::std::i32::MAX
+            Some(x) => {
+                UTC::now()
+                    .naive_utc()
+                    .signed_duration_since(x)
+                    .num_seconds() as i32
+            }
+            None => ::std::i32::MAX,
         }
-        
+
     }
 }
 
@@ -136,7 +143,7 @@ impl NewCheck {
     pub fn insert_if_url_not_exists(&self) -> Check {
         match Check::exists(&self.url) {
             Ok(check) => check,
-            Err(_) => self.insert()
+            Err(_) => self.insert(),
         }
     }
 }
