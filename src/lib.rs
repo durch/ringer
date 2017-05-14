@@ -7,53 +7,25 @@ extern crate dotenv;
 #[macro_use]
 extern crate error_chain;
 extern crate curl;
+extern crate serde;
+extern crate serde_json;
+#[macro_use]
+extern crate serde_derive;
+extern crate sharp_pencil as pencil;
 
 pub mod models;
 pub mod schema;
 pub mod utils;
 
-use models::{Check, NewCheck};
-
-use std::{thread, time};
-
-mod fdw_error {
+pub mod error {
     error_chain! {
         foreign_links {
             Diesel(::diesel::result::Error);
             Curl(::curl::Error);
             FromUtf8(::std::string::FromUtf8Error);
+            Json(::serde_json::Error);
         }
     }
-}
-
-use fdw_error::Result;
-
-fn min_rate(checks: &[Check]) -> i32 {
-    checks
-        .iter()
-        .fold(60, |s, x| if s < x.rate { s } else { x.rate })
-}
-
-fn sample_run() -> Result<()> {
-    let mut checks;
-    let mut idle_time;
-    loop {
-        checks = Check::get_all()?;
-        idle_time = min_rate(&checks[..]);
-        for mut check in checks {
-            let _ = check.conditional_perform();
-        }
-        thread::sleep(time::Duration::from_secs(idle_time as u64))
-    }
-}
-
-fn main() {
-    let adex = NewCheck {
-        url: String::from("https://w.adex.cloud"),
-        rate: 60,
-    };
-    let _ = adex.insert_if_url_not_exists();
-    let _ = sample_run();
 }
 
 #[cfg(test)]

@@ -3,11 +3,42 @@ use super::schema::checks;
 use diesel;
 use diesel::prelude::*;
 use diesel::SaveChangesDsl;
-use fdw_error::Result;
+use error::Result;
 
 use utils::establish_connection;
 use curl::easy::Easy;
 use chrono::prelude::*;
+
+#[derive(Serialize, Deserialize)]
+pub struct SerdeCheck {
+    pub id: i32,
+    pub url: String,
+    pub rate: i32,
+    pub last_start: Option<String>,
+    pub last_end: Option<String>,
+    pub http_status: Option<i32>,
+    pub state: Option<String>,
+}
+
+impl<'a> From<&'a Check> for SerdeCheck {
+    fn from(c: &Check) -> Self {
+        SerdeCheck {
+            id: c.id,
+            url: c.url.clone(),
+            rate: c.rate,
+            last_start: match c.last_start {
+                Some(x) => Some(format!("{}", x)),
+                None => None,
+            },
+            last_end: match c.last_end {
+                Some(x) => Some(format!("{}", x)),
+                None => None,
+            },
+            http_status: c.http_status,
+            state: c.state.clone(),
+        }
+    }
+}
 
 #[derive(Debug, Queryable, Identifiable, Associations, PartialEq, AsChangeset)]
 pub struct Check {
@@ -20,7 +51,6 @@ pub struct Check {
     pub state: Option<String>,
 }
 
-
 impl Check {
     pub fn exists(url: &str) -> Result<Self> {
         Ok(checks::table
@@ -28,8 +58,15 @@ impl Check {
                .get_result(&establish_connection())?)
     }
 
-    pub fn get_all() -> Result<Vec<Self>> {
-        Ok(checks::table.load(&establish_connection())?)
+    pub fn get_all(limit: Option<i64>) -> Result<Vec<Self>> {
+        match limit {
+            Some(l) => Ok(checks::table.limit(l).load(&establish_connection())?),
+            None => Ok(checks::table.load(&establish_connection())?),
+        }
+    }
+
+    pub fn all_for_serde(limit: Option<i64>) -> Result<Vec<SerdeCheck>> {
+        Ok(Check::get_all(limit)?.iter().map(|x| x.into()).collect())
     }
 
     pub fn u_state(&mut self, new_state: String) -> Result<Self> {
@@ -87,8 +124,11 @@ impl Check {
         let _ = self.u_last_end(UTC::now().naive_utc());
         let _ = self.u_state(String::from_utf8(dst)?);
         let _ = self.u_http_status(easy.response_code()?);
-        println!("{} - Ran check : {} - {}", UTC::now(), self.url, self.http_status.unwrap_or(418));
-        return Ok(());
+        println!("{} - Ran check : {} - {}",
+                 UTC::now(),
+                 self.url,
+                 self.http_status.unwrap_or(418));
+        Ok(())
     }
 
     pub fn valid(&self) -> bool {
@@ -123,7 +163,7 @@ impl From<NewCheck> for Check {
     }
 }
 
-#[derive(Insertable)]
+#[derive(Insertable, Deserialize)]
 #[table_name = "checks"]
 pub struct NewCheck {
     pub url: String,

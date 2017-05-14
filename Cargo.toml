@@ -3,6 +3,18 @@ name = "ringer"
 version = "0.1.0"
 authors = ["Drazen Urch <github@drazenur.ch>"]
 
+[[bin]]
+name = "checker"
+path = "src/bin/checker.rs"
+
+[[bin]]
+name = "api-server"
+path = "src/bin/api-server.rs"
+
+[lib]
+name = "ringer"
+path = "src/lib.rs"
+
 [dependencies]
 chrono = "*"
 diesel = { version = "^0.12", features = ["postgres" , "chrono"] }
@@ -10,3 +22,8 @@ diesel_codegen = { version = "^0.12", features = ["postgres"] }
 dotenv = "^0.10"
 error-chain = "*"
 curl = "*"
+sharp_pencil = "*"
+
+serde = "*"
+serde_json = "*"
+serde_derive = "*"

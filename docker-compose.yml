@@ -1,0 +1,12 @@
+version: "2"
+services:
+  pg:
+    image: postgres:latest
+  ringer:
+    build:
+      context: .
+      args:
+        RUST_TOOLCHAIN: nightly
+    links:
+      - pg
+    command: cargo test
