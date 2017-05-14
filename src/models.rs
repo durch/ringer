@@ -124,10 +124,10 @@ impl Check {
         let _ = self.u_last_end(UTC::now().naive_utc());
         let _ = self.u_state(String::from_utf8(dst)?);
         let _ = self.u_http_status(easy.response_code()?);
-        println!("{} - Ran check : {} - {}",
-                 UTC::now(),
-                 self.url,
-                 self.http_status.unwrap_or(418));
+        // println!("{} - Ran check : {} - {}",
+        //          UTC::now(),
+        //          self.url,
+        //          self.http_status.unwrap_or(418));
         Ok(())
     }
 
