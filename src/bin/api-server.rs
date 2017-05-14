@@ -71,5 +71,5 @@ fn main() {
     app.set_debug(true);
     app.get("/", "check:list", check_list);
     app.put("/check:add", "check:add", check_add);
-    app.run("127.0.0.1:5000");
+    app.run("0.0.0.0:5000");
 }
