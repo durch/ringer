@@ -69,7 +69,7 @@ fn check_add(r: &mut Request) -> PencilResult {
 fn main() {
     let mut app = Pencil::new("/check:list");
     app.set_debug(true);
-    app.get("/", "check:list", check_list);
-    app.put("/check:add", "check:add", check_add);
+    app.get("/v0/check:list", "check:list", check_list);
+    app.put("/v0/check:add", "check:add", check_add);
     app.run("0.0.0.0:5000");
 }
