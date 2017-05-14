@@ -19,36 +19,36 @@ fn check_list(_: &mut Request) -> PencilResult {
 
 fn newcheck_from_request(r: &mut Request) -> Result<NewCheck> {
     Ok(match *r.get_json() {
-        Some(ref value) => {
-            if let Some(obj) = value.as_object() {
-                NewCheck {
-                    url: match obj.get("url") {
-                        Some(url) => {
-                            if url.is_string() {
-                                String::from(url.as_str().unwrap())
-                            } else {
-                                bail!("url needs to ne string!")
-                            }
-                        }
-                        None => bail!("url is mandatory!"), 
-                    },
-                    rate: match obj.get("rate") {
-                        Some(rate) => {
-                            if rate.is_number() {
-                                rate.as_i64().unwrap() as i32
-                            } else {
-                                bail!("rate needs to ne integer!")
-                            }
-                        }
-                        None => bail!("rate rate is mandatory!"),
-                    },
-                }
-            } else {
-                bail!("data must be wrapped in a JSON object")
-            }
-        }
-        None => bail!("no json data found"),
-    })
+           Some(ref value) => {
+               if let Some(obj) = value.as_object() {
+                   NewCheck {
+                       url: match obj.get("url") {
+                           Some(url) => {
+                               if let Some(x) = url.as_str() {
+                                   String::from(x)
+                               } else {
+                                   bail!("url needs to be a JSON string!")
+                               }
+                           }
+                           None => bail!("url is mandatory!"), 
+                       },
+                       rate: match obj.get("rate") {
+                           Some(rate) => {
+                               if let Some(x) = rate.as_i64() {
+                                   x as i32
+                               } else {
+                                   bail!("rate needs to ne integer!")
+                               }
+                           }
+                           None => bail!("rate is mandatory!"),
+                       },
+                   }
+               } else {
+                   bail!("data must be wrapped in a JSON object")
+               }
+           }
+           None => bail!("no json data found"),
+       })
 }
 
 fn check_add(r: &mut Request) -> PencilResult {

@@ -16,3 +16,4 @@ ADD . /code
 WORKDIR /code
 
 ENV PATH=$RUSTUP_BIN:$PATH
+ENTRYPOINT ./entrypoint.sh

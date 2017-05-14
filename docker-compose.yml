@@ -9,4 +9,6 @@ services:
         RUST_TOOLCHAIN: nightly
     links:
       - pg
+    environment:
+      - $DB_URL=postgres://postgres:@192.168.99.100/ringer
     command: cargo test
