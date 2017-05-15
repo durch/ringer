@@ -10,5 +10,7 @@ services:
     links:
       - pg
     environment:
-      - $DB_URL=postgres://postgres:@192.168.99.100/ringer
+      - DATABASE_URL=postgres://postgres:@pg/ringer
+      - MATTERMOST_URL=https://matter.oneiros.cc
+      - MATTERMOST_HOOK=dyrhpx1dejy5ujctzn6tmjstio
     command: cargo test

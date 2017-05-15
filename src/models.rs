@@ -20,6 +20,7 @@ pub struct SerdeCheck {
     pub state: Option<String>,
 }
 
+
 impl<'a> From<&'a Check> for SerdeCheck {
     fn from(c: &Check) -> Self {
         SerdeCheck {
@@ -100,11 +101,14 @@ impl Check {
                .first::<Self>(&establish_connection())?)
     }
 
-    pub fn conditional_perform(&mut self) -> Result<()> {
+    pub fn conditional_perform(&mut self) -> Result<bool> {
         if self.rate <= self.duration_since_last_end() {
-            self.perform()?
+            self.perform()?;
+            Ok(true)
+        } else {
+            Ok(false)
         }
-        Ok(())
+        
     }
 
     pub fn perform(&mut self) -> Result<()> {
@@ -121,13 +125,9 @@ impl Check {
                                 })?;
             transfer.perform()?;
         }
-        let _ = self.u_last_end(UTC::now().naive_utc());
-        let _ = self.u_state(String::from_utf8(dst)?);
-        let _ = self.u_http_status(easy.response_code()?);
-        // println!("{} - Ran check : {} - {}",
-        //          UTC::now(),
-        //          self.url,
-        //          self.http_status.unwrap_or(418));
+        self.u_last_end(UTC::now().naive_utc())?;
+        self.u_state(String::from_utf8(dst)?)?;
+        self.u_http_status(easy.response_code()?)?;
         Ok(())
     }
 

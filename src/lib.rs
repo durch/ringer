@@ -33,6 +33,25 @@ mod tests {
     use models::{Check, NewCheck};
 
     #[test]
+    fn test_mattermost() {
+        use utils::{Attachment, Message, mattermost};
+
+        let attachment = Attachment {
+            fallback: "test",
+            color: "#0073CF",
+            pretext: "",
+            text: "Test message text",
+            title: "Test message title",
+            title_link: "",
+            fields: Vec::new(),
+            image_url: "",
+        };
+        let message = Message { attachments: vec![attachment] };
+        let status_code = mattermost(&message).unwrap_or(400);
+        assert!(status_code == 200);
+    }
+
+    #[test]
     fn test_perform_check() {
         let new_check = NewCheck {
             url: String::from("https://www.rust-lang.org/"),

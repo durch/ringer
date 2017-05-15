@@ -16,4 +16,5 @@ ADD . /code
 WORKDIR /code
 
 ENV PATH=$RUSTUP_BIN:$PATH
-ENTRYPOINT ./entrypoint.sh
+
+RUN cargo build --release

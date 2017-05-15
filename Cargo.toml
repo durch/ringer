@@ -23,6 +23,8 @@ dotenv = "^0.10"
 error-chain = "*"
 curl = "*"
 sharp_pencil = "*"
+hyper = "*"
+unicase = "*"
 
 serde = "*"
 serde_json = "*"

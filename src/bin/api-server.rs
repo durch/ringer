@@ -4,6 +4,8 @@ extern crate ringer;
 extern crate serde_json;
 #[macro_use]
 extern crate error_chain;
+extern crate hyper;
+extern crate unicase;
 
 use ringer::error::Result;
 use ringer::models::{Check, NewCheck};
@@ -62,9 +64,7 @@ fn check_add(r: &mut Request) -> PencilResult {
         Err(e) => Ok(Response::from(serde_json::to_string(
             &json!({"status": 400, "error": e.description()})).unwrap())),
     }
-
 }
-
 
 fn main() {
     let mut app = Pencil::new("/check:list");
