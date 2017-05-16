@@ -102,13 +102,13 @@ impl Check {
     }
 
     pub fn conditional_perform(&mut self) -> Result<bool> {
+        // println!("{}", self.duration_since_last_end());
         if self.rate <= self.duration_since_last_end() {
             self.perform()?;
             Ok(true)
         } else {
             Ok(false)
         }
-        
     }
 
     pub fn perform(&mut self) -> Result<()> {

@@ -65,7 +65,7 @@ pub fn mattermost(message: &Message) -> Result<u32> {
     Ok(easy.response_code()?)
 }
 
-pub fn alert_on_error_code(check: &Check) -> Result<()> {
+pub fn alert_on_error_code(check: &mut Check) -> Result<()> {
     if check.http_status.unwrap_or(418) > 400 {
         let attachment = Attachment {
             fallback: &format!("{}, {:?} - {}",
