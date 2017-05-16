@@ -66,10 +66,28 @@ fn check_add(r: &mut Request) -> PencilResult {
     }
 }
 
+fn check_run(r: &mut Request) -> PencilResult {
+    if let Some(id) = r.args().get("id") {
+        let id: &str = id;
+        match Check::get(id.parse().unwrap_or(-1)) {
+            Ok(mut check) => {
+                match check.perform() {
+                    Ok(_) => Ok(Response::from("Ok")),
+                    Err(e) => Ok(Response::from(e.description())),
+                }
+            }
+            Err(e) => Ok(Response::from(e.description())),
+        }
+    } else {
+        Ok(Response::from("id cannot be empty!"))
+    }
+}
+
 fn main() {
     let mut app = Pencil::new("/check:list");
     app.set_debug(true);
     app.get("/v0/check:list", "check:list", check_list);
     app.put("/v0/check:add", "check:add", check_add);
+    app.get("/v0/check:run", "check:run", check_run);
     app.run("0.0.0.0:5000");
 }
