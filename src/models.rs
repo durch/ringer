@@ -10,8 +10,6 @@ use curl::easy::Easy;
 use chrono::prelude::*;
 use chrono_humanize::HumanTime;
 
-use url::Url;
-
 #[derive(Serialize, Deserialize)]
 pub struct SerdeCheck {
     pub id: i32,
@@ -179,30 +177,9 @@ pub struct NewCheck {
 }
 
 impl NewCheck {
-    fn validate_url(&self) -> Result<()> {
-        match Url::parse(&self.url) {
-            Ok(_) => Ok(()),
-            Err(_) => bail!("invalid url")
-        }
-    }
-
-    fn validate_rate(&self) -> Result<()> {
-        if self.rate >= 60 {
-            Ok(())
-        } else {
-            bail!("rate must be greater than 60 seconds")
-        }
-    }
-
-    fn validate(&self) -> Result<()> {
-        self.validate_rate()?;
-        self.validate_url()?;
-        Ok(())
-    }
 
     pub fn insert(&self) -> Result<Check> {
         use schema::checks;
-        self.validate()?;
         Ok(diesel::insert(self)
             .into(checks::table)
             .get_result(&establish_connection())
@@ -210,7 +187,6 @@ impl NewCheck {
     }
 
     pub fn insert_if_url_not_exists(&self) -> Result<Check> {
-        self.validate()?;
         match Check::exists(&self.url) {
             Ok(check) => Ok(check),
             Err(_) => self.insert(),

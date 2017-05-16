@@ -4,12 +4,13 @@ extern crate ringer;
 extern crate serde_json;
 #[macro_use]
 extern crate error_chain;
-extern crate hyper;
-extern crate unicase;
+extern crate url;
 
 use ringer::error::Result;
 use ringer::models::{Check, NewCheck};
 use pencil::{Pencil, Request, Response, PencilResult};
+
+use url::Url;
 
 fn check_list(_: &mut Request) -> PencilResult {
 
@@ -19,37 +20,50 @@ fn check_list(_: &mut Request) -> PencilResult {
        })
 }
 
+fn validate_rate(rate: i64) -> Result<i32> {
+    if rate >= 60 {
+        Ok(rate as i32)
+    } else {
+        bail!("rate must be greater than 60 seconds")
+    }
+}
+
+fn validate_url(url: &str) -> Result<String> {
+    match Url::parse(url) {
+        Ok(_) => Ok(String::from(url)),
+        Err(_) => bail!("invalid url"),
+    }
+}
+
+
 fn newcheck_from_request(r: &mut Request) -> Result<NewCheck> {
-    Ok(match *r.get_json() {
-           Some(ref value) => {
-               if let Some(obj) = value.as_object() {
-                   NewCheck {
-                       url: match obj.get("url") {
-                           Some(url) => {
-                               if let Some(x) = url.as_str() {
-                                   String::from(x)
-                               } else {
-                                   bail!("url needs to be a JSON string!")
-                               }
-                           }
-                           None => bail!("url is mandatory!"), 
-                       },
-                       rate: match obj.get("rate") {
-                           Some(rate) => {
-                               if let Some(x) = rate.as_i64() {
-                                   x as i32
-                               } else {
-                                   bail!("rate needs to ne integer!")
-                               }
-                           }
-                           None => bail!("rate is mandatory!"),
-                       },
-                   }
-               } else {
-                   bail!("data must be wrapped in a JSON object")
+    Ok(if let Some(ref value) = *r.get_json() {
+           if let Some(obj) = value.as_object() {
+               NewCheck {
+                   url: if let Some(url) = obj.get("url") {
+                       if let Some(x) = url.as_str() {
+                           validate_url(x)?
+                       } else {
+                           bail!("url needs to be a JSON string!")
+                       }
+                   } else {
+                       bail!("url is mandatory!")
+                   },
+                   rate: if let Some(rate) = obj.get("rate") {
+                       if let Some(x) = rate.as_i64() {
+                           validate_rate(x)?
+                       } else {
+                           bail!("rate needs to be an integer!")
+                       }
+                   } else {
+                       bail!("rate is mandatory!")
+                   },
                }
+           } else {
+               bail!("data must be wrapped in a JSON object")
            }
-           None => bail!("no json data found"),
+       } else {
+           bail!("no json data found")
        })
 }
 
