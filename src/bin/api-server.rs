@@ -50,8 +50,8 @@ fn newcheck_from_request(r: &mut Request) -> Result<NewCheck> {
                        bail!("url is mandatory!")
                    },
                    rate: if let Some(rate) = obj.get("rate") {
-                       if let Some(x) = rate.as_i64() {
-                           validate_rate(x)?
+                       if let Some(x) = rate.as_str() {
+                           validate_rate(x.parse()?)?
                        } else {
                            bail!("rate needs to be an integer!")
                        }

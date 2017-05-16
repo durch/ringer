@@ -27,6 +27,7 @@ pub mod error {
             Curl(::curl::Error);
             FromUtf8(::std::string::FromUtf8Error);
             Json(::serde_json::Error);
+            ToInt(::std::num::ParseIntError);
         }
     }
 }
