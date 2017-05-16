@@ -40,7 +40,6 @@ fn run<F>(funs: &[F]) -> Result<()>
     let mut checks;
     let mut idle_time;
     loop {
-        let mut n = 0;
         checks = Check::get_all(None)?;
         let l = checks.len();
         idle_time = min_rate(&checks[..]);
@@ -49,13 +48,12 @@ fn run<F>(funs: &[F]) -> Result<()>
         for mut check in checks {
             let future = cpu_pool.spawn(async_check(&mut check, funs));
             futures.push(future);
-            n += 1;
         }
         // for future in futures {
         //     future.wait()?;
         //     n += 1;
         // }
-        println!("{} - Performing {}/{} checks", UTC::now(), n, l);
+        println!("{} - Performing {}/{} checks", UTC::now(), futures.len(), l);
         thread::sleep(time::Duration::from_secs(idle_time as u64));
     }
 }

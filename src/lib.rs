@@ -13,6 +13,8 @@ extern crate serde_json;
 extern crate serde_derive;
 extern crate sharp_pencil as pencil;
 extern crate futures;
+extern crate chrono_humanize;
+extern crate url;
 
 pub mod models;
 pub mod schema;

@@ -8,6 +8,9 @@ use error::Result;
 use utils::establish_connection;
 use curl::easy::Easy;
 use chrono::prelude::*;
+use chrono_humanize::HumanTime;
+
+use url::Url;
 
 #[derive(Serialize, Deserialize)]
 pub struct SerdeCheck {
@@ -18,6 +21,7 @@ pub struct SerdeCheck {
     pub last_end: Option<String>,
     pub http_status: Option<i32>,
     pub state: Option<String>,
+    pub humanized_end: Option<String>,
 }
 
 
@@ -37,6 +41,10 @@ impl<'a> From<&'a Check> for SerdeCheck {
             },
             http_status: c.http_status,
             state: c.state.clone(),
+            humanized_end: match c.last_end {
+                Some(x) => Some(format!("{}", HumanTime::from(x.signed_duration_since(UTC::now().naive_utc())))),
+                None => None,
+            }
         }
     }
 }
@@ -171,18 +179,40 @@ pub struct NewCheck {
 }
 
 impl NewCheck {
-    pub fn insert(&self) -> Check {
-        use schema::checks;
-
-        diesel::insert(self)
-            .into(checks::table)
-            .get_result(&establish_connection())
-            .expect("Error saving new check")
+    fn validate_url(&self) -> Result<()> {
+        match Url::parse(&self.url) {
+            Ok(_) => Ok(()),
+            Err(_) => bail!("invalid url")
+        }
     }
 
-    pub fn insert_if_url_not_exists(&self) -> Check {
+    fn validate_rate(&self) -> Result<()> {
+        if self.rate >= 60 {
+            Ok(())
+        } else {
+            bail!("rate must be greater than 60 seconds")
+        }
+    }
+
+    fn validate(&self) -> Result<()> {
+        self.validate_rate()?;
+        self.validate_url()?;
+        Ok(())
+    }
+
+    pub fn insert(&self) -> Result<Check> {
+        use schema::checks;
+        self.validate()?;
+        Ok(diesel::insert(self)
+            .into(checks::table)
+            .get_result(&establish_connection())
+            .expect("Error saving new check"))
+    }
+
+    pub fn insert_if_url_not_exists(&self) -> Result<Check> {
+        self.validate()?;
         match Check::exists(&self.url) {
-            Ok(check) => check,
+            Ok(check) => Ok(check),
             Err(_) => self.insert(),
         }
     }
