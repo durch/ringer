@@ -65,15 +65,23 @@ impl Check {
                .get_result(&establish_connection())?)
     }
 
-    pub fn get_all(limit: Option<i64>) -> Result<Vec<Self>> {
+    pub fn get_ilike(limit: Option<i64>, query: String) -> Result<Vec<Self>> {
         match limit {
-            Some(l) => Ok(checks::table.limit(l).load(&establish_connection())?),
-            None => Ok(checks::table.load(&establish_connection())?),
+            Some(l) => Ok(checks::table.filter(checks::url.like(query.to_lowercase())).limit(l).load(&establish_connection())?),
+            None => Ok(checks::table.filter(checks::url.like(query.to_lowercase())).load(&establish_connection())?),
         }
     }
 
-    pub fn all_for_serde(limit: Option<i64>) -> Result<Vec<SerdeCheck>> {
-        Ok(Check::get_all(limit)?.iter().map(|x| x.into()).collect())
+    pub fn get_all(limit: Option<i64>) -> Result<Vec<Self>> {
+        match limit {
+            Some(l) => Ok(checks::table.order(checks::http_status.desc()).limit(l).load(&establish_connection())?),
+            None => Ok(checks::table.order(checks::http_status.desc()).load(&establish_connection())?),
+        }
+    }
+
+
+    pub fn for_serde(checks: Vec<Check>) -> Result<Vec<SerdeCheck>> {
+        Ok(checks.iter().map(|x| x.into()).collect())
     }
 
     pub fn u_state(&mut self, new_state: String) -> Result<Self> {

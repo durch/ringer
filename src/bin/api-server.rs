@@ -13,11 +13,20 @@ use pencil::{Pencil, Request, Response, PencilResult};
 use url::Url;
 
 fn check_list(_: &mut Request) -> PencilResult {
+    Ok(match Check::get_all(Some(20)) {
+               Ok(checks) => {
+                   match Check::for_serde(checks) {
+                       Ok(ref serde_checks) => {
+                           Response::from(serde_json::to_string(serde_checks).unwrap())
+                       }
+                       Err(ref e) => {
+                           Response::from(serde_json::to_string(e.description()).unwrap())
+                       }
+                   }
+               }
+               Err(ref e) => Response::from(serde_json::to_string(e.description()).unwrap()),
 
-    Ok(match Check::all_for_serde(Some(20)) {
-           Ok(ref serde_checks) => Response::from(serde_json::to_string(serde_checks).unwrap()),
-           Err(ref e) => Response::from(serde_json::to_string(e.description()).unwrap()),
-       })
+           })
 }
 
 fn validate_rate(rate: i64) -> Result<i32> {
@@ -99,6 +108,27 @@ fn check_delete(r: &mut Request) -> PencilResult {
     }
 }
 
+fn check_find(r: &mut Request) -> PencilResult {
+    if let Some(query) = r.args().get("query") {
+        let query: &str = query;
+        Ok(match Check::get_ilike(Some(20), String::from(query)) {
+               Ok(checks) => {
+                   match Check::for_serde(checks) {
+                       Ok(ref serde_checks) => {
+                           Response::from(serde_json::to_string(serde_checks).unwrap())
+                       }
+                       Err(ref e) => {
+                           Response::from(serde_json::to_string(e.description()).unwrap())
+                       }
+                   }
+               }
+               Err(ref e) => Response::from(serde_json::to_string(e.description()).unwrap()),
+
+           })
+    } else {
+        Ok(Response::from("query cannot be empty!"))
+    }
+}
 
 fn check_run(r: &mut Request) -> PencilResult {
     if let Some(id) = r.args().get("id") {
