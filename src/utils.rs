@@ -11,6 +11,8 @@ use models::Check;
 
 use std::io::Read;
 
+use chrono::format::strftime::StrftimeItems;
+
 #[derive(Debug, Serialize)]
 pub struct Message<'a> {
     pub attachments: Vec<Attachment<'a>>,
@@ -66,6 +68,7 @@ pub fn mattermost(message: &Message) -> Result<u32> {
 }
 
 pub fn alert_on_error_code(check: &mut Check) -> Result<()> {
+    let fmt = StrftimeItems::new("%Y-%m-%dT%H:%M:%S");
     if check.http_status.unwrap_or(418) > 400 {
         let attachment = Attachment {
             fallback: &format!("{}, {:?} - {}",
@@ -75,7 +78,10 @@ pub fn alert_on_error_code(check: &mut Check) -> Result<()> {
             color: "#DC143C",
             pretext: "",
             text: &format!("{:?} - code: {}",
-                          check.last_end,
+                            match check.last_end {
+                                Some(time) => format!("{}", time.format_with_items(fmt)),
+                                None => format!("No timestamp for last check end, id: {}", check.id)      
+                            },
                           check.http_status.unwrap_or(418)),
             title: &check.url,
             title_link: &check.url,
@@ -83,10 +89,8 @@ pub fn alert_on_error_code(check: &mut Check) -> Result<()> {
             image_url: "",
         };
         let message = Message { attachments: vec![attachment] };
-        let status_code = mattermost(&message)?;
-        print!("{}", status_code);
+        mattermost(&message)?;
     }
-
     Ok(())
 }
 

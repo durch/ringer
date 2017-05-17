@@ -59,5 +59,5 @@ fn run<F>(funs: &[F]) -> Result<()>
 }
 
 fn main() {
-    run(&[alert_on_error_code]);
+    run(&[alert_on_error_code]).unwrap();
 }
