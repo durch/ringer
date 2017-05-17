@@ -82,6 +82,24 @@ fn check_add(r: &mut Request) -> PencilResult {
     }
 }
 
+fn check_delete(r: &mut Request) -> PencilResult {
+    if let Some(id) = r.args().get("id") {
+        let id: &str = id;
+        match Check::get(id.parse().unwrap_or(-1)) {
+            Ok(check) => {
+                match check.delete() {
+                    Ok(_) => Ok(Response::from("Ok")),
+                    Err(e) => Ok(Response::from(e.description())),
+                }
+            }
+            Err(e) => Ok(Response::from(e.description())),
+        }
+    } else {
+        Ok(Response::from("id cannot be empty!"))
+    }
+}
+
+
 fn check_run(r: &mut Request) -> PencilResult {
     if let Some(id) = r.args().get("id") {
         let id: &str = id;
@@ -105,5 +123,6 @@ fn main() {
     app.get("/v0/check:list", "check:list", check_list);
     app.put("/v0/check:add", "check:add", check_add);
     app.get("/v0/check:run", "check:run", check_run);
+    app.delete("/v0/check:delete", "check:delete", check_delete);
     app.run("0.0.0.0:5000");
 }
