@@ -10,23 +10,23 @@ use ringer::error::Result;
 use ringer::models::{Check, NewCheck};
 use pencil::{Pencil, Request, Response, PencilResult};
 
+use std::env;
+
 use url::Url;
 
 fn check_list(_: &mut Request) -> PencilResult {
     Ok(match Check::get_all(Some(20)) {
-               Ok(checks) => {
-                   match Check::for_serde(checks) {
-                       Ok(ref serde_checks) => {
-                           Response::from(serde_json::to_string(serde_checks).unwrap())
-                       }
-                       Err(ref e) => {
-                           Response::from(serde_json::to_string(e.description()).unwrap())
-                       }
+           Ok(checks) => {
+               match Check::for_serde(checks) {
+                   Ok(ref serde_checks) => {
+                       Response::from(serde_json::to_string(serde_checks).unwrap())
                    }
+                   Err(ref e) => Response::from(serde_json::to_string(e.description()).unwrap()),
                }
-               Err(ref e) => Response::from(serde_json::to_string(e.description()).unwrap()),
+           }
+           Err(ref e) => Response::from(serde_json::to_string(e.description()).unwrap()),
 
-           })
+       })
 }
 
 fn validate_rate(rate: i64) -> Result<i32> {
@@ -108,6 +108,16 @@ fn check_delete(r: &mut Request) -> PencilResult {
     }
 }
 
+fn key_auth(r: &mut Request) -> Option<PencilResult> {
+    let master = env::var("MASTER_KEY").expect("MASTER_KEY must be set");
+    let unauth = Some(Ok(Response::from(serde_json::to_string(&json!({"code": 401, "status": "Unauthorized"})).unwrap())));
+    if let Some(key) = r.args().get("key") {
+        if key == master { None } else { unauth }
+    } else {
+        unauth
+    }
+}
+
 fn check_find(r: &mut Request) -> PencilResult {
     if let Some(query) = r.args().get("query") {
         let query: &str = query;
@@ -148,11 +158,12 @@ fn check_run(r: &mut Request) -> PencilResult {
 }
 
 fn main() {
-    let mut app = Pencil::new("/check:list");
+    let mut app = Pencil::new("/");
     app.set_debug(true);
     app.get("/v0/check:list", "check:list", check_list);
     app.put("/v0/check:add", "check:add", check_add);
     app.get("/v0/check:run", "check:run", check_run);
     app.delete("/v0/check:delete", "check:delete", check_delete);
+    app.before_request(key_auth);
     app.run("0.0.0.0:5000");
 }

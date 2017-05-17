@@ -4,7 +4,7 @@ extern crate curl;
 extern crate futures;
 extern crate futures_cpupool;
 
-use futures::{future, Future};
+use futures::future;
 use futures_cpupool::CpuPool;
 
 use std::{thread, time};
