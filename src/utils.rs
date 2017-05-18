@@ -69,20 +69,21 @@ pub fn mattermost(message: &Message) -> Result<u32> {
 
 pub fn alert_on_error_code(check: &mut Check) -> Result<()> {
     let fmt = StrftimeItems::new("%Y-%m-%dT%H:%M:%S");
+    let last_time = match check.last_end {
+                        Some(time) => format!("{}", time.format_with_items(fmt)),
+                        None => format!("No timestamp for last check end, id: {}", check.id),      
+                    };
     if check.http_status.unwrap_or(418) > 400 {
         let attachment = Attachment {
             fallback: &format!("{}, {:?} - {}",
-                              check.url,
-                              check.last_end,
-                              check.http_status.unwrap_or(418)),
+                    check.url,
+                    last_time,
+                    check.http_status.unwrap_or(418)),
             color: "#DC143C",
             pretext: "",
             text: &format!("{:?} - code: {}",
-                            match check.last_end {
-                                Some(time) => format!("{}", time.format_with_items(fmt)),
-                                None => format!("No timestamp for last check end, id: {}", check.id)      
-                            },
-                          check.http_status.unwrap_or(418)),
+                    last_time,
+                    check.http_status.unwrap_or(418)),
             title: &check.url,
             title_link: &check.url,
             fields: Vec::new(),

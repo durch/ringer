@@ -1,0 +1,8 @@
+CREATE TABLE check_runs (
+  id SERIAL PRIMARY KEY,
+  check_id INTEGER REFERENCES checks(id) NOT NULL,
+  starttime TIMESTAMP WITH TIME ZONE NOT NULL,
+  endtime TIMESTAMP WITH TIME ZONE NOT NULL,
+  latency INTEGER NOT NULL,
+  http_status INTEGER NOT NULL
+);

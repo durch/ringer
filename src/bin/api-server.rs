@@ -80,8 +80,10 @@ fn check_add(r: &mut Request) -> PencilResult {
     match newcheck_from_request(r) {
         Ok(newcheck) => {
             match newcheck.insert_if_url_not_exists() {
-                Ok(check) => Ok(Response::from(serde_json::to_string(&json!({"id": check.id, "status": 200}))
-                                  .unwrap())),
+                Ok(mut check) => {
+                    check.perform().unwrap();
+                    Ok(Response::from(serde_json::to_string(&json!({"id": check.id, "status": 200}))
+                                  .unwrap()))},
                 Err(e) => Ok(Response::from(serde_json::to_string(
             &json!({"status": 400, "error": e.description()})).unwrap())),
             }

@@ -1,5 +1,5 @@
 use chrono::NaiveDateTime;
-use super::schema::checks;
+use super::schema::*;
 use diesel;
 use diesel::prelude::*;
 use diesel::SaveChangesDsl;
@@ -9,6 +9,76 @@ use utils::establish_connection;
 use curl::easy::Easy;
 use chrono::prelude::*;
 use chrono_humanize::HumanTime;
+
+#[derive(Debug, Queryable, Identifiable, Associations)]
+pub struct CheckRun {
+    pub id: i32,
+    pub check_id: i32,
+    pub starttime: NaiveDateTime,
+    pub endtime: NaiveDateTime,
+    pub http_status: i32,
+    pub latency: i32
+}
+
+impl CheckRun {
+    pub fn get_from_check_id(limit: Option<i64>, check_id: i32) -> Result<Vec<Self>> {
+        match limit {
+            Some(l) => Ok(check_runs::table.filter(check_runs::check_id.eq(check_id)).limit(l).load(&establish_connection())?),
+            None => Ok(check_runs::table.filter(check_runs::check_id.eq(check_id)).load(&establish_connection())?)
+        }
+    }
+}
+
+#[derive(Insertable)]
+#[table_name = "check_runs"]
+pub struct NewCheckRun {
+    pub check_id: i32,
+    pub starttime: NaiveDateTime,
+    pub endtime: NaiveDateTime,
+    pub http_status: i32,
+    pub latency: i32
+}
+
+impl NewCheckRun {
+    pub fn insert(&self) -> Result<CheckRun> {
+        Ok(diesel::insert(self)
+            .into(check_runs::table)
+            .get_result(&establish_connection())
+            .expect("Error saving new check"))
+    }
+}
+
+impl<'a> From<&'a mut Check> for NewCheckRun {
+    fn from(check: &'a mut Check) -> Self {
+        let starttime = match check.last_start {
+                Some(x) => x,
+                None => panic!("last_start is not set, this should impossible")
+            };
+        let endtime = match check.last_end {
+                Some(x) => x,
+                None => panic!("last_start is not set, this should impossible")
+            };
+        
+        NewCheckRun {
+            check_id: check.id,
+            starttime: starttime,
+            endtime: endtime,
+            http_status: match check.http_status {
+                Some(x) => x,
+                None => panic!("http_status is not set, this should impossible")
+            },
+            latency: endtime.signed_duration_since(starttime).num_milliseconds() as i32
+        }
+    }
+}
+    
+HasMany! {
+    (check_runs, foreign_key = check_id)
+    #[table_name(checks)]
+    struct Check {
+        id: i32,
+    }
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct SerdeCheck {
@@ -142,6 +212,8 @@ impl Check {
         self.u_last_end(UTC::now().naive_utc())?;
         self.u_state(String::from_utf8(dst)?)?;
         self.u_http_status(easy.response_code()?)?;
+        let checkrun = NewCheckRun::from(self);
+        checkrun.insert();
         Ok(())
     }
 
