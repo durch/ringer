@@ -44,14 +44,15 @@ fn run<F>(funs: &[F]) -> Result<()>
     where F: Fn(&mut Check) -> Result<()>
 {
     let cpu_pool = CpuPool::new(10);
-    let publish_interval = 10;
+    
     let mut checks;
     let mut idle_time: u64;
     let mut start;
     let mut duration: u64;
     let mut now;
-    let mut interval: u64;
+    let mut ticks: u64;
     loop {
+        let mut publish_interval = 10;
         start = UTC::now().naive_utc();
         checks = Check::get_all(None)?;
         let l = checks.len();
@@ -62,24 +63,20 @@ fn run<F>(funs: &[F]) -> Result<()>
             let future = cpu_pool.spawn(async_check(&mut check, funs));
             futures.push(future);
         }
-        // for future in futures {
-        //     future.wait()?;
-        //     n += 1;
-        // }
-        interval = idle_time / publish_interval;
+        
+        ticks = idle_time / publish_interval;
         now = UTC::now().naive_utc();
         println!("{} - Performing {}/{} checks", now, futures.len(), l);
         duration = now.signed_duration_since(start).num_seconds() as u64;
-        if duration < interval {
-            interval -= duration
+        if duration < publish_interval {
+            publish_interval -= duration
         }
-        for _ in 0..interval {
-            println!("{}", UTC::now());
+        for _ in 0..ticks {
+            // println!("{}", UTC::now());
             trigger_sse()?;
             thread::sleep(time::Duration::from_secs(publish_interval));    
         }
-        // trigger_sse()?;
-        // thread::sleep(time::Duration::from_secs(idle_time as u64));
+        
     }
 }
 
