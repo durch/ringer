@@ -5,7 +5,12 @@ extern crate serde_json;
 #[macro_use]
 extern crate error_chain;
 extern crate url;
+extern crate curl;
+extern crate dotenv;
 
+use std::io::Read;
+use curl::easy::Easy;
+use dotenv::dotenv;
 use ringer::error::Result;
 use ringer::models::{Check, NewCheck};
 use pencil::{Pencil, Request, Response, PencilResult};
@@ -26,6 +31,54 @@ fn check_list(_: &mut Request) -> PencilResult {
            }
            Err(ref e) => Response::from(serde_json::to_string(e.description()).unwrap()),
 
+       })
+}
+
+fn publish(data: &str) -> Result<u32> {
+    dotenv().ok();
+
+    let esper_url = env::var("ESPER_URL").expect("ESPER_URL must be set");
+    let mut easy = Easy::new();
+    let mut data = data.as_bytes();
+    easy.url(&esper_url)?;
+    easy.post(true)?;
+    easy.post_field_size(data.len() as u64)?;
+    {
+        let mut transfer = easy.transfer();
+        transfer
+            .read_function(|buf| Ok(data.read(buf).unwrap_or(0)))
+            .unwrap();
+        transfer.perform().unwrap();
+    }
+    Ok(easy.response_code()?)
+}
+
+// Trailing newline ensures JSON parsability
+fn format_sse(payload: &str) -> String {
+    format!("event: message\ndata: {}\n", payload)
+}
+
+fn check_publish(_: &mut Request) -> PencilResult {
+    Ok(match Check::get_all(Some(20)) {
+           Ok(checks) => {
+               match Check::for_serde(checks) {
+                   Ok(ref serde_checks) => {
+                       let payload = serde_json::to_string(serde_checks).unwrap();
+                       match publish(&format_sse(&payload)) {
+                           Ok(code) => {
+                Response::from(serde_json::to_string(&json!({"code": code, "status": "published"}))
+                                   .unwrap())
+            }
+                           Err(ref e) => {
+                               Response::from(serde_json::to_string(e.description()).unwrap())
+                           }
+                       }
+
+                   }
+                   Err(ref e) => Response::from(serde_json::to_string(e.description()).unwrap()),
+               }
+           }
+           Err(ref e) => Response::from(serde_json::to_string(e.description()).unwrap()),
        })
 }
 
@@ -83,7 +136,8 @@ fn check_add(r: &mut Request) -> PencilResult {
                 Ok(mut check) => {
                     check.perform().unwrap();
                     Ok(Response::from(serde_json::to_string(&json!({"id": check.id, "status": 200}))
-                                  .unwrap()))},
+                                  .unwrap()))
+                }
                 Err(e) => Ok(Response::from(serde_json::to_string(
             &json!({"status": 400, "error": e.description()})).unwrap())),
             }
@@ -111,6 +165,8 @@ fn check_delete(r: &mut Request) -> PencilResult {
 }
 
 fn key_auth(r: &mut Request) -> Option<PencilResult> {
+    dotenv().ok();
+
     let master = env::var("MASTER_KEY").expect("MASTER_KEY must be set");
     let unauth = Some(Ok(Response::from(serde_json::to_string(&json!({"code": 401, "status": "Unauthorized"})).unwrap())));
     if let Some(key) = r.args().get("key") {
@@ -166,6 +222,7 @@ fn main() {
     app.put("/v0/check:add", "check:add", check_add);
     app.get("/v0/check:run", "check:run", check_run);
     app.delete("/v0/check:delete", "check:delete", check_delete);
+    app.get("/v0/check:publish", "check:publish", check_publish);
     app.before_request(key_auth);
     app.run("0.0.0.0:5000");
 }

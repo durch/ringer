@@ -56,7 +56,6 @@ pub fn mattermost(message: &Message) -> Result<u32> {
     easy.post(true)?;
     easy.post_field_size(data.len() as u64)?;
     easy.http_headers(list)?;
-
     {
         let mut transfer = easy.transfer();
         transfer

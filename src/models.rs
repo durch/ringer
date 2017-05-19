@@ -88,7 +88,6 @@ pub struct SerdeCheck {
     pub last_start: Option<String>,
     pub last_end: Option<String>,
     pub http_status: Option<i32>,
-    pub state: Option<String>,
     pub humanized_end: Option<String>,
 }
 
@@ -108,7 +107,6 @@ impl<'a> From<&'a Check> for SerdeCheck {
                 None => None,
             },
             http_status: c.http_status,
-            state: c.state.clone(),
             humanized_end: match c.last_end {
                 Some(x) => Some(format!("{}", HumanTime::from(x.signed_duration_since(UTC::now().naive_utc())))),
                 None => None,
