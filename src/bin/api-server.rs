@@ -19,6 +19,8 @@ use std::env;
 
 use url::Url;
 
+// Requires MASTER_KEY, ESPER_URL and DATABASE_URL 
+
 fn check_list(_: &mut Request) -> PencilResult {
     Ok(match Check::get_all(Some(20)) {
            Ok(checks) => {

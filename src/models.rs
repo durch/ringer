@@ -199,7 +199,7 @@ impl Check {
         easy.url(&self.url)?;
         let _ = self.u_last_start(UTC::now().naive_utc());
         {
-            let mut transfer = easy.transfer();
+            let mut transfer = easy.transfer(); 
             transfer
                 .write_function(|data| {
                                     dst.extend_from_slice(data);
