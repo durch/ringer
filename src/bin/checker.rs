@@ -70,11 +70,11 @@ fn run<F>(funs: &[F]) -> Result<()>
         println!("{} - Performing {}/{} checks", now, futures.len(), l);
         duration = now.signed_duration_since(start).num_seconds() as u64;
         if duration <= 10 {
-            idle_time -= duration
+            interval -= duration
         }
         for _ in 1..interval {
             trigger_sse()?;
-            thread::sleep(time::Duration::from_secs(idle_time));    
+            thread::sleep(time::Duration::from_secs(interval));    
         }
         // trigger_sse()?;
         // thread::sleep(time::Duration::from_secs(idle_time as u64));

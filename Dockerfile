@@ -1,7 +1,7 @@
 FROM phusion/baseimage
 
 # stable|beta|nightly
-ARG RUST_TOOLCHAIN=nightly
+ARG RUST_TOOLCHAIN=stable
 ENV RUSTUP_HOME=/tmp/rustup 
 ENV RUSTUP_BIN=$RUSTUP_HOME/toolchains/${RUST_TOOLCHAIN}-x86_64-unknown-linux-gnu/bin
 
