@@ -44,6 +44,7 @@ fn run<F>(funs: &[F]) -> Result<()>
     where F: Fn(&mut Check) -> Result<()>
 {
     let cpu_pool = CpuPool::new(10);
+    let publish_interval = 10;
     let mut checks;
     let mut idle_time: u64;
     let mut start;
@@ -65,16 +66,17 @@ fn run<F>(funs: &[F]) -> Result<()>
         //     future.wait()?;
         //     n += 1;
         // }
-        interval = idle_time / 10;
+        interval = idle_time / publish_interval;
         now = UTC::now().naive_utc();
         println!("{} - Performing {}/{} checks", now, futures.len(), l);
         duration = now.signed_duration_since(start).num_seconds() as u64;
-        if duration <= 10 {
+        if duration < interval {
             interval -= duration
         }
-        for _ in 1..interval {
+        for _ in 0..interval {
+            println!("{}", UTC::now());
             trigger_sse()?;
-            thread::sleep(time::Duration::from_secs(interval));    
+            thread::sleep(time::Duration::from_secs(publish_interval));    
         }
         // trigger_sse()?;
         // thread::sleep(time::Duration::from_secs(idle_time as u64));
