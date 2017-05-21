@@ -13,6 +13,8 @@ use std::io::Read;
 
 use chrono::format::strftime::StrftimeItems;
 
+use pwhash::{bcrypt, sha512_crypt};
+
 #[derive(Debug, Serialize)]
 pub struct Message<'a> {
     pub attachments: Vec<Attachment<'a>>,
@@ -36,6 +38,17 @@ pub struct Field {
     pub title: String,
     pub value: String,
 }
+
+pub fn process_pass(pass: &str) -> Result<String> {
+
+    Ok(bcrypt::hash_with(bcrypt::BcryptSetup {
+                             variant: Some(bcrypt::BcryptVariant::V2b),
+                             cost: Some(10),
+                             salt: None,
+                         },
+                         &sha512_crypt::hash(pass)?)?)
+}
+
 
 pub fn mattermost(message: &Message) -> Result<u32> {
     dotenv().ok();
@@ -69,9 +82,9 @@ pub fn mattermost(message: &Message) -> Result<u32> {
 pub fn alert_on_error_code(check: &mut Check) -> Result<()> {
     let fmt = StrftimeItems::new("%Y-%m-%dT%H:%M:%S");
     let last_time = match check.last_end {
-                        Some(time) => format!("{}", time.format_with_items(fmt)),
-                        None => format!("No timestamp for last check end, id: {}", check.id),      
-                    };
+        Some(time) => format!("{}", time.format_with_items(fmt)),
+        None => format!("No timestamp for last check end, id: {}", check.id),      
+    };
     if check.http_status.unwrap_or(418) > 400 {
         let attachment = Attachment {
             fallback: &format!("{}, {:?} - {}",

@@ -1,27 +1,21 @@
-extern crate sharp_pencil as pencil;
-extern crate ringer;
-#[macro_use]
-extern crate serde_json;
-#[macro_use]
-extern crate error_chain;
-extern crate url;
-extern crate curl;
-extern crate dotenv;
-
 use std::io::Read;
 use curl::easy::Easy;
 use dotenv::dotenv;
 use ringer::error::Result;
 use ringer::models::{Check, NewCheck};
-use pencil::{Pencil, Request, Response, PencilResult};
-
+use pencil::{Request, Response, PencilResult};
+use serde_json;
 use std::env;
+
+use std::error::Error;
 
 use url::Url;
 
-// Requires MASTER_KEY, ESPER_URL and DATABASE_URL 
+fn format_sse(payload: &str) -> String {
+    format!("event: message\ndata: {}\n", payload)
+}
 
-fn check_list(_: &mut Request) -> PencilResult {
+pub fn list(_: &mut Request) -> PencilResult {
     Ok(match Check::get_all(Some(20)) {
            Ok(checks) => {
                match Check::for_serde(checks) {
@@ -36,7 +30,7 @@ fn check_list(_: &mut Request) -> PencilResult {
        })
 }
 
-fn publish(data: &str) -> Result<u32> {
+fn _publish(data: &str) -> Result<u32> {
     dotenv().ok();
 
     let esper_url = env::var("ESPER_URL").expect("ESPER_URL must be set");
@@ -55,18 +49,13 @@ fn publish(data: &str) -> Result<u32> {
     Ok(easy.response_code()?)
 }
 
-// Trailing newline ensures JSON parsability
-fn format_sse(payload: &str) -> String {
-    format!("event: message\ndata: {}\n", payload)
-}
-
-fn check_publish(_: &mut Request) -> PencilResult {
+pub fn publish(_: &mut Request) -> PencilResult {
     Ok(match Check::get_all(Some(20)) {
            Ok(checks) => {
                match Check::for_serde(checks) {
                    Ok(ref serde_checks) => {
                        let payload = serde_json::to_string(serde_checks).unwrap();
-                       match publish(&format_sse(&payload)) {
+                       match _publish(&format_sse(&payload)) {
                            Ok(code) => {
                 Response::from(serde_json::to_string(&json!({"code": code, "status": "published"}))
                                    .unwrap())
@@ -83,22 +72,6 @@ fn check_publish(_: &mut Request) -> PencilResult {
            Err(ref e) => Response::from(serde_json::to_string(e.description()).unwrap()),
        })
 }
-
-fn validate_rate(rate: i64) -> Result<i32> {
-    if rate >= 60 {
-        Ok(rate as i32)
-    } else {
-        bail!("rate must be greater than 60 seconds")
-    }
-}
-
-fn validate_url(url: &str) -> Result<String> {
-    match Url::parse(url) {
-        Ok(_) => Ok(String::from(url)),
-        Err(_) => bail!("invalid url"),
-    }
-}
-
 
 fn newcheck_from_request(r: &mut Request) -> Result<NewCheck> {
     Ok(if let Some(ref value) = *r.get_json() {
@@ -131,7 +104,7 @@ fn newcheck_from_request(r: &mut Request) -> Result<NewCheck> {
        })
 }
 
-fn check_add(r: &mut Request) -> PencilResult {
+pub fn add(r: &mut Request) -> PencilResult {
     match newcheck_from_request(r) {
         Ok(newcheck) => {
             match newcheck.insert_if_url_not_exists() {
@@ -149,7 +122,7 @@ fn check_add(r: &mut Request) -> PencilResult {
     }
 }
 
-fn check_delete(r: &mut Request) -> PencilResult {
+pub fn delete(r: &mut Request) -> PencilResult {
     if let Some(id) = r.args().get("id") {
         let id: &str = id;
         match Check::get(id.parse().unwrap_or(-1)) {
@@ -166,19 +139,7 @@ fn check_delete(r: &mut Request) -> PencilResult {
     }
 }
 
-fn key_auth(r: &mut Request) -> Option<PencilResult> {
-    dotenv().ok();
-
-    let master = env::var("MASTER_KEY").expect("MASTER_KEY must be set");
-    let unauth = Some(Ok(Response::from(serde_json::to_string(&json!({"code": 401, "status": "Unauthorized"})).unwrap())));
-    if let Some(key) = r.args().get("key") {
-        if key == master { None } else { unauth }
-    } else {
-        unauth
-    }
-}
-
-fn check_find(r: &mut Request) -> PencilResult {
+pub fn find(r: &mut Request) -> PencilResult {
     if let Some(query) = r.args().get("query") {
         let query: &str = query;
         Ok(match Check::get_ilike(Some(20), String::from(query)) {
@@ -200,7 +161,7 @@ fn check_find(r: &mut Request) -> PencilResult {
     }
 }
 
-fn check_run(r: &mut Request) -> PencilResult {
+pub fn run(r: &mut Request) -> PencilResult {
     if let Some(id) = r.args().get("id") {
         let id: &str = id;
         match Check::get(id.parse().unwrap_or(-1)) {
@@ -217,14 +178,17 @@ fn check_run(r: &mut Request) -> PencilResult {
     }
 }
 
-fn main() {
-    let mut app = Pencil::new("/");
-    app.set_debug(true);
-    app.get("/v0/check:list", "check:list", check_list);
-    app.put("/v0/check:add", "check:add", check_add);
-    app.get("/v0/check:run", "check:run", check_run);
-    app.delete("/v0/check:delete", "check:delete", check_delete);
-    app.get("/v0/check:publish", "check:publish", check_publish);
-    app.before_request(key_auth);
-    app.run("0.0.0.0:5000");
+fn validate_rate(rate: i64) -> Result<i32> {
+    if rate >= 60 {
+        Ok(rate as i32)
+    } else {
+        bail!("rate must be greater than 60 seconds")
+    }
+}
+
+fn validate_url(url: &str) -> Result<String> {
+    match Url::parse(url) {
+        Ok(_) => Ok(String::from(url)),
+        Err(_) => bail!("invalid url"),
+    }
 }

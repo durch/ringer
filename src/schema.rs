@@ -21,3 +21,21 @@ table! {
         http_status -> Int4,
     }
 }
+
+table! {
+    sessions (id) {
+        id -> Int4,
+        ext_id -> Text,
+        valid_until -> Timestamptz,
+    }
+}
+
+table! {
+    users (id) {
+        id -> Int4,
+        email -> Text,
+        pass -> Text,
+        created -> Timestamptz,
+        updated -> Nullable<Timestamptz>,
+    }
+}

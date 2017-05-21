@@ -9,7 +9,7 @@ path = "src/bin/checker.rs"
 
 [[bin]]
 name = "api-server"
-path = "src/bin/api-server.rs"
+path = "src/bin/api-server/main.rs"
 
 [lib]
 name = "ringer"
@@ -27,6 +27,7 @@ sharp_pencil = "*"
 hyper = "*"
 unicase = "*"
 url = "*"
+pwhash = "*"
 
 serde = "*"
 serde_json = "*"

@@ -15,6 +15,7 @@ extern crate sharp_pencil as pencil;
 extern crate futures;
 extern crate chrono_humanize;
 extern crate url;
+extern crate pwhash;
 
 pub mod models;
 pub mod schema;
@@ -28,6 +29,7 @@ pub mod error {
             FromUtf8(::std::string::FromUtf8Error);
             Json(::serde_json::Error);
             ToInt(::std::num::ParseIntError);
+            PwHash(::pwhash::error::Error);
         }
     }
 }

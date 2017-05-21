@@ -9,6 +9,110 @@ use utils::establish_connection;
 use curl::easy::Easy;
 use chrono::prelude::*;
 use chrono_humanize::HumanTime;
+use dotenv::dotenv;
+use std::env;
+use pwhash::sha256_crypt;
+
+
+#[derive(Debug, Queryable, Identifiable, Associations)]
+pub struct User {
+    pub id: i32,
+    pub email: String,
+    pub pass: String,
+    pub created: NaiveDateTime,
+    pub updated: Option<NaiveDateTime>,
+}
+
+impl User {
+    pub fn get_by_email(email: &str) -> Result<Self> {
+        Ok(users::table
+               .filter(users::email.eq(email))
+               .first(&establish_connection())?)
+    }
+
+    pub fn exists(email: &str) -> Result<Self> {
+        Ok(users::table
+               .filter(users::email.eq(email))
+               .get_result(&establish_connection())?)
+    }
+}
+
+#[derive(Debug, Insertable)]
+#[table_name="users"]
+pub struct NewUser {
+    pub email: String,
+    pub pass: String,
+}
+
+impl NewUser {
+    pub fn insert(&self) -> Result<User> {
+        Ok(diesel::insert(self)
+               .into(users::table)
+               .get_result(&establish_connection())
+               .expect("Error saving new check"))
+    }
+
+    pub fn insert_if_email_not_exists(&self) -> bool {
+        match User::exists(&self.email) {
+            Ok(user) => false,
+            Err(_) => true,
+        }
+    }
+}
+
+
+#[derive(Debug, Queryable, Identifiable, Associations)]
+pub struct Session {
+    pub id: i32,
+    pub ext_id: String,
+    pub valid_until: NaiveDateTime,
+}
+
+impl Session {
+    pub fn get_by_ext_id(ext_id: &str) -> Result<Self> {
+        Ok(sessions::table
+               .filter(sessions::ext_id.eq(ext_id))
+               .first(&establish_connection())?)
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.valid_until < UTC::now().naive_utc()
+    }
+
+    pub fn delete(&self) -> Result<usize> {
+        Ok(diesel::delete(self).execute(&establish_connection())?)
+    }
+
+    pub fn return_fresh_id() -> Result<String> {
+        Ok(NewSession::new()?.insert()?.ext_id)
+    }
+}
+
+#[derive(Debug, Insertable)]
+#[table_name="sessions"]
+pub struct NewSession {
+    pub ext_id: String,
+    pub valid_until: NaiveDateTime,
+}
+
+impl NewSession {
+    pub fn new() -> Result<Self> {
+        dotenv().ok();
+        let pepper = env::var("PEPPER").expect("PEPPER must be set");
+        let timestamp = UTC::now().naive_utc().timestamp();
+        Ok(NewSession {
+               ext_id: sha256_crypt::hash(&format!("{}{}", timestamp, pepper))?,
+               valid_until: UTC::now().naive_utc(),
+           })
+    }
+
+    pub fn insert(&self) -> Result<Session> {
+        Ok(diesel::insert(self)
+               .into(sessions::table)
+               .get_result(&establish_connection())
+               .expect("Error saving new check"))
+    }
+}
 
 #[derive(Debug, Queryable, Identifiable, Associations)]
 pub struct CheckRun {
@@ -17,14 +121,23 @@ pub struct CheckRun {
     pub starttime: NaiveDateTime,
     pub endtime: NaiveDateTime,
     pub http_status: i32,
-    pub latency: i32
+    pub latency: i32,
 }
 
 impl CheckRun {
     pub fn get_from_check_id(limit: Option<i64>, check_id: i32) -> Result<Vec<Self>> {
         match limit {
-            Some(l) => Ok(check_runs::table.filter(check_runs::check_id.eq(check_id)).limit(l).load(&establish_connection())?),
-            None => Ok(check_runs::table.filter(check_runs::check_id.eq(check_id)).load(&establish_connection())?)
+            Some(l) => {
+                Ok(check_runs::table
+                       .filter(check_runs::check_id.eq(check_id))
+                       .limit(l)
+                       .load(&establish_connection())?)
+            }
+            None => {
+                Ok(check_runs::table
+                       .filter(check_runs::check_id.eq(check_id))
+                       .load(&establish_connection())?)
+            }
         }
     }
 }
@@ -36,42 +149,42 @@ pub struct NewCheckRun {
     pub starttime: NaiveDateTime,
     pub endtime: NaiveDateTime,
     pub http_status: i32,
-    pub latency: i32
+    pub latency: i32,
 }
 
 impl NewCheckRun {
     pub fn insert(&self) -> Result<CheckRun> {
         Ok(diesel::insert(self)
-            .into(check_runs::table)
-            .get_result(&establish_connection())
-            .expect("Error saving new check"))
+               .into(check_runs::table)
+               .get_result(&establish_connection())
+               .expect("Error saving new check"))
     }
 }
 
 impl<'a> From<&'a mut Check> for NewCheckRun {
     fn from(check: &'a mut Check) -> Self {
         let starttime = match check.last_start {
-                Some(x) => x,
-                None => panic!("last_start is not set, this should impossible")
-            };
+            Some(x) => x,
+            None => panic!("last_start is not set, this should impossible"),
+        };
         let endtime = match check.last_end {
-                Some(x) => x,
-                None => panic!("last_start is not set, this should impossible")
-            };
-        
+            Some(x) => x,
+            None => panic!("last_end is not set, this should impossible"),
+        };
+
         NewCheckRun {
             check_id: check.id,
             starttime: starttime,
             endtime: endtime,
             http_status: match check.http_status {
                 Some(x) => x,
-                None => panic!("http_status is not set, this should impossible")
+                None => panic!("http_status is not set, this should impossible"),
             },
-            latency: endtime.signed_duration_since(starttime).num_milliseconds() as i32
+            latency: endtime.signed_duration_since(starttime).num_milliseconds() as i32,
         }
     }
 }
-    
+
 HasMany! {
     (check_runs, foreign_key = check_id)
     #[table_name(checks)]
@@ -108,9 +221,12 @@ impl<'a> From<&'a Check> for SerdeCheck {
             },
             http_status: c.http_status,
             humanized_end: match c.last_end {
-                Some(x) => Some(format!("{}", HumanTime::from(x.signed_duration_since(UTC::now().naive_utc())))),
+                Some(x) => {
+                    Some(format!("{}",
+                                 HumanTime::from(x.signed_duration_since(UTC::now().naive_utc()))))
+                }
                 None => None,
-            }
+            },
         }
     }
 }
@@ -135,15 +251,37 @@ impl Check {
 
     pub fn get_ilike(limit: Option<i64>, query: String) -> Result<Vec<Self>> {
         match limit {
-            Some(l) => Ok(checks::table.filter(checks::url.like(query.to_lowercase())).limit(l).load(&establish_connection())?),
-            None => Ok(checks::table.filter(checks::url.like(query.to_lowercase())).load(&establish_connection())?),
+            Some(l) => {
+                Ok(checks::table
+                       .filter(checks::url.like(query.to_lowercase()))
+                       .order(checks::http_status.desc())
+                       .limit(l)
+                       .load(&establish_connection())?)
+            }
+            None => {
+                Ok(checks::table
+                       .filter(checks::url.like(query.to_lowercase()))
+                       .order(checks::http_status.desc())
+                       .load(&establish_connection())?)
+            }
         }
     }
 
     pub fn get_all(limit: Option<i64>) -> Result<Vec<Self>> {
         match limit {
-            Some(l) => Ok(checks::table.order(checks::http_status.desc()).limit(l).load(&establish_connection())?),
-            None => Ok(checks::table.order(checks::http_status.desc()).load(&establish_connection())?),
+            Some(l) => {
+                Ok(checks::table
+                       .order(checks::http_status.desc())
+                       .order(checks::id)
+                       .limit(l)
+                       .load(&establish_connection())?)
+            }
+            None => {
+                Ok(checks::table
+                       .order(checks::http_status.desc())
+                       .order(checks::id)
+                       .load(&establish_connection())?)
+            }
         }
     }
 
@@ -199,7 +337,7 @@ impl Check {
         easy.url(&self.url)?;
         let _ = self.u_last_start(UTC::now().naive_utc());
         {
-            let mut transfer = easy.transfer(); 
+            let mut transfer = easy.transfer();
             transfer
                 .write_function(|data| {
                                     dst.extend_from_slice(data);
@@ -211,7 +349,7 @@ impl Check {
         self.u_state(String::from_utf8(dst)?)?;
         self.u_http_status(easy.response_code()?)?;
         let checkrun = NewCheckRun::from(self);
-        checkrun.insert();
+        checkrun.insert()?;
         Ok(())
     }
 
@@ -255,13 +393,12 @@ pub struct NewCheck {
 }
 
 impl NewCheck {
-
     pub fn insert(&self) -> Result<Check> {
         use schema::checks;
         Ok(diesel::insert(self)
-            .into(checks::table)
-            .get_result(&establish_connection())
-            .expect("Error saving new check"))
+               .into(checks::table)
+               .get_result(&establish_connection())
+               .expect("Error saving new check"))
     }
 
     pub fn insert_if_url_not_exists(&self) -> Result<Check> {
