@@ -18,9 +18,10 @@ path = "src/lib.rs"
 [dependencies]
 chrono = "*"
 chrono-humanize = "*"
-diesel = { version = "^0.12", features = ["postgres" , "chrono"] }
-diesel_codegen = { version = "^0.12", features = ["postgres"] }
-dotenv = "^0.10"
+time = "*"
+diesel = { version = "*", features = ["postgres" , "chrono", "serde_json"] }
+diesel_codegen = { version = "*", features = ["postgres"] }
+dotenv = "*"
 error-chain = "*"
 curl = "*"
 sharp_pencil = "*"

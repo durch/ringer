@@ -16,6 +16,7 @@ extern crate futures;
 extern crate chrono_humanize;
 extern crate url;
 extern crate pwhash;
+extern crate time;
 
 pub mod models;
 pub mod schema;

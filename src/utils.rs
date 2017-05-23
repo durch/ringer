@@ -2,6 +2,8 @@ use diesel::pg::PgConnection;
 use diesel::Connection;
 use dotenv::dotenv;
 use std::env;
+use std::hash::{Hash, Hasher};
+use std::collections::hash_map::DefaultHasher;
 
 use serde_json;
 use error::Result;
@@ -13,7 +15,7 @@ use std::io::Read;
 
 use chrono::format::strftime::StrftimeItems;
 
-use pwhash::{bcrypt, sha512_crypt};
+use pwhash::bcrypt;
 
 #[derive(Debug, Serialize)]
 pub struct Message<'a> {
@@ -39,14 +41,27 @@ pub struct Field {
     pub value: String,
 }
 
-pub fn process_pass(pass: &str) -> Result<String> {
+pub fn hash<T: Hash>(t: &T) -> String {
+    let mut s = DefaultHasher::new();
+    t.hash(&mut s);
+    let h = s.finish();
+    format!("{}", h)
+}
 
+pub fn process_pass(pass: &str) -> Result<String> {
+    if pass.len() < 8 {
+        bail!("Password too short, 8 char is minimum, but you should do like 32")
+    }
     Ok(bcrypt::hash_with(bcrypt::BcryptSetup {
                              variant: Some(bcrypt::BcryptVariant::V2b),
                              cost: Some(10),
                              salt: None,
                          },
-                         &sha512_crypt::hash(pass)?)?)
+                         &hash(&pass))?)
+}
+
+pub fn verify_pass(pass: &str, existing: &str) -> bool {
+    bcrypt::verify(&hash(&pass), existing)
 }
 
 

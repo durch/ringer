@@ -4,6 +4,8 @@ use diesel;
 use diesel::prelude::*;
 use diesel::SaveChangesDsl;
 use error::Result;
+use utils::{hash, process_pass};
+use time::Duration;
 
 use utils::establish_connection;
 use curl::easy::Easy;
@@ -11,7 +13,6 @@ use chrono::prelude::*;
 use chrono_humanize::HumanTime;
 use dotenv::dotenv;
 use std::env;
-use pwhash::sha256_crypt;
 
 
 #[derive(Debug, Queryable, Identifiable, Associations)]
@@ -42,20 +43,22 @@ impl User {
 pub struct NewUser {
     pub email: String,
     pub pass: String,
+    pub created: NaiveDateTime
 }
 
 impl NewUser {
-    pub fn insert(&self) -> Result<User> {
+    pub fn insert(&mut self) -> Result<User> {
+        self.pass = process_pass(&self.pass)?;
         Ok(diesel::insert(self)
                .into(users::table)
                .get_result(&establish_connection())
                .expect("Error saving new check"))
     }
 
-    pub fn insert_if_email_not_exists(&self) -> bool {
+    pub fn insert_if_email_not_exists(&mut self) -> Result<User> {
         match User::exists(&self.email) {
-            Ok(user) => false,
-            Err(_) => true,
+            Ok(user) => Ok(user),
+            Err(_) => self.insert(),
         }
     }
 }
@@ -76,7 +79,7 @@ impl Session {
     }
 
     pub fn is_valid(&self) -> bool {
-        self.valid_until < UTC::now().naive_utc()
+        UTC::now().naive_utc() < self.valid_until 
     }
 
     pub fn delete(&self) -> Result<usize> {
@@ -101,8 +104,8 @@ impl NewSession {
         let pepper = env::var("PEPPER").expect("PEPPER must be set");
         let timestamp = UTC::now().naive_utc().timestamp();
         Ok(NewSession {
-               ext_id: sha256_crypt::hash(&format!("{}{}", timestamp, pepper))?,
-               valid_until: UTC::now().naive_utc(),
+               ext_id: format!("x{}", hash(&format!("{}{}", timestamp, pepper))),
+               valid_until: UTC::now().naive_utc() + Duration::hours(1),
            })
     }
 
@@ -151,6 +154,7 @@ pub struct NewCheckRun {
     pub http_status: i32,
     pub latency: i32,
 }
+
 
 impl NewCheckRun {
     pub fn insert(&self) -> Result<CheckRun> {

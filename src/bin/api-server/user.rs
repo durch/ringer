@@ -1,8 +1,8 @@
 use ringer::error::Result;
 use ringer::models::{Session, User, NewUser};
-use ringer::utils::process_pass;
-use pencil::{Request, Response, PencilResult};
-use serde_json;
+use ringer::utils::verify_pass;
+use pencil::{Request, Response, PencilResult, PencilError, HTTPError};
+use chrono::prelude::*;
 
 fn newuser_from_request(r: &mut Request) -> Result<NewUser> {
     Ok(if let Some(ref value) = *r.get_json() {
@@ -17,15 +17,16 @@ fn newuser_from_request(r: &mut Request) -> Result<NewUser> {
                    } else {
                        bail!("email is mandatory!")
                    },
-                   pass: if let Some(rate) = obj.get("rate") {
+                   pass: if let Some(rate) = obj.get("pass") {
                        if let Some(x) = rate.as_str() {
-                           process_pass(x)?
+                           String::from(x)
                        } else {
                            bail!("invalid password")
                        }
                    } else {
                        bail!("password is mandatory!")
                    },
+                   created: UTC::now().naive_utc(),
                }
            } else {
                bail!("data must be wrapped in a JSON object")
@@ -36,42 +37,39 @@ fn newuser_from_request(r: &mut Request) -> Result<NewUser> {
 }
 
 pub fn login(r: &mut Request) -> PencilResult {
-    let foff = Ok(Response::from("invalid credentials"));
-    if let Some(email) = r.args().get::<String>("email") {
-        match User::get_by_email(email) {
-            Ok(user) => {
-                if let Some(pass) = r.args().get::<String>("pass") {
-                    if user.pass == process_pass(pass).unwrap_or_default() {
+    match newuser_from_request(r) {
+        Ok(newuser) => {
+            match User::exists(&newuser.email) {
+                Ok(user) => {
+                    if verify_pass(&newuser.pass, &user.pass) {
                         match Session::return_fresh_id() {
                             Ok(id) => Ok(Response::from(id)),
-                            Err(e) => {
-                                Ok(Response::from(serde_json::to_string(e.description()).unwrap()))
-                            }
+                            Err(_) => Err(PencilError::PenHTTPError(HTTPError::Forbidden)),
                         }
                     } else {
-                        foff
+                        Err(PencilError::PenHTTPError(HTTPError::Forbidden))
                     }
-                } else {
-                    foff
                 }
+                Err(_) => Err(PencilError::PenHTTPError(HTTPError::Unauthorized)),
             }
-            Err(_) => foff,
         }
-    } else {
-        foff
+        Err(_) => Err(PencilError::PenHTTPError(HTTPError::UnprocessableEntity)),
     }
 }
 
+
 pub fn register(r: &mut Request) -> PencilResult {
     match newuser_from_request(r) {
-        Ok(newuser) => {
-            if newuser.insert_if_email_not_exists() {
-                Ok(Response::from(serde_json::to_string(&json!({"status": 200})).unwrap()))
-            } else {
-                Ok(Response::from(serde_json::to_string(&json!({"status": 400})).unwrap()))
+        Ok(mut newuser) => {
+            match User::exists(&newuser.email) {
+                // If a user exists, we return error, since this is register
+                Ok(_) => Err(PencilError::PenHTTPError(HTTPError::Conflict)),
+                Err(_) => {
+                    newuser.insert().unwrap();
+                    Ok(Response::from("Ok"))
+                }
             }
         }
-        Err(e) => Ok(Response::from(serde_json::to_string(
-            &json!({"status": 400, "error": e.description()})).unwrap())),
+        Err(_) => Err(PencilError::PenHTTPError(HTTPError::UnprocessableEntity)),
     }
 }

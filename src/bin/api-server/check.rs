@@ -3,7 +3,7 @@ use curl::easy::Easy;
 use dotenv::dotenv;
 use ringer::error::Result;
 use ringer::models::{Check, NewCheck};
-use pencil::{Request, Response, PencilResult};
+use pencil::{Request, Response, PencilResult, PencilError, HTTPError};
 use serde_json;
 use std::env;
 
@@ -16,18 +16,18 @@ fn format_sse(payload: &str) -> String {
 }
 
 pub fn list(_: &mut Request) -> PencilResult {
-    Ok(match Check::get_all(Some(20)) {
-           Ok(checks) => {
-               match Check::for_serde(checks) {
-                   Ok(ref serde_checks) => {
-                       Response::from(serde_json::to_string(serde_checks).unwrap())
-                   }
-                   Err(ref e) => Response::from(serde_json::to_string(e.description()).unwrap()),
-               }
-           }
-           Err(ref e) => Response::from(serde_json::to_string(e.description()).unwrap()),
+    match Check::get_all(Some(20)) {
+        Ok(checks) => {
+            match Check::for_serde(checks) {
+                Ok(ref serde_checks) => {
+                    Ok(Response::from(serde_json::to_string(serde_checks).unwrap()))
+                }
+                Err(_) => Err(PencilError::PenHTTPError(HTTPError::InternalServerError)),
+            }
+        }
+        Err(_) => Err(PencilError::PenHTTPError(HTTPError::InternalServerError)),
 
-       })
+    }
 }
 
 fn _publish(data: &str) -> Result<u32> {
@@ -50,27 +50,22 @@ fn _publish(data: &str) -> Result<u32> {
 }
 
 pub fn publish(_: &mut Request) -> PencilResult {
-    Ok(match Check::get_all(Some(20)) {
-           Ok(checks) => {
-               match Check::for_serde(checks) {
-                   Ok(ref serde_checks) => {
-                       let payload = serde_json::to_string(serde_checks).unwrap();
-                       match _publish(&format_sse(&payload)) {
-                           Ok(code) => {
-                Response::from(serde_json::to_string(&json!({"code": code, "status": "published"}))
-                                   .unwrap())
+    match Check::get_all(Some(20)) {
+        Ok(checks) => {
+            match Check::for_serde(checks) {
+                Ok(ref serde_checks) => {
+                    let payload = serde_json::to_string(serde_checks).unwrap();
+                    match _publish(&format_sse(&payload)) {
+                        Ok(code) => Ok(Response::from(serde_json::to_string(&json!({"code": code, "status": "published"}))
+                                   .unwrap())),
+                        Err(_) => Err(PencilError::PenHTTPError(HTTPError::InternalServerError)),
+                    }
+                }
+                Err(_) => Err(PencilError::PenHTTPError(HTTPError::InternalServerError)),
             }
-                           Err(ref e) => {
-                               Response::from(serde_json::to_string(e.description()).unwrap())
-                           }
-                       }
-
-                   }
-                   Err(ref e) => Response::from(serde_json::to_string(e.description()).unwrap()),
-               }
-           }
-           Err(ref e) => Response::from(serde_json::to_string(e.description()).unwrap()),
-       })
+        }
+        Err(_) => Err(PencilError::PenHTTPError(HTTPError::InternalServerError)),
+    }
 }
 
 fn newcheck_from_request(r: &mut Request) -> Result<NewCheck> {
@@ -113,12 +108,10 @@ pub fn add(r: &mut Request) -> PencilResult {
                     Ok(Response::from(serde_json::to_string(&json!({"id": check.id, "status": 200}))
                                   .unwrap()))
                 }
-                Err(e) => Ok(Response::from(serde_json::to_string(
-            &json!({"status": 400, "error": e.description()})).unwrap())),
+                Err(_) => Err(PencilError::PenHTTPError(HTTPError::BadRequest)),
             }
         }
-        Err(e) => Ok(Response::from(serde_json::to_string(
-            &json!({"status": 400, "error": e.description()})).unwrap())),
+        Err(_) => Err(PencilError::PenHTTPError(HTTPError::BadRequest)),
     }
 }
 
@@ -129,35 +122,33 @@ pub fn delete(r: &mut Request) -> PencilResult {
             Ok(check) => {
                 match check.delete() {
                     Ok(_) => Ok(Response::from("Ok")),
-                    Err(e) => Ok(Response::from(e.description())),
+                    Err(_) => Err(PencilError::PenHTTPError(HTTPError::InternalServerError)),
                 }
             }
-            Err(e) => Ok(Response::from(e.description())),
+            Err(_) => Err(PencilError::PenHTTPError(HTTPError::BadRequest))
         }
     } else {
-        Ok(Response::from("id cannot be empty!"))
+        Err(PencilError::PenHTTPError(HTTPError::BadRequest))
     }
 }
 
 pub fn find(r: &mut Request) -> PencilResult {
     if let Some(query) = r.args().get("query") {
         let query: &str = query;
-        Ok(match Check::get_ilike(Some(20), String::from(query)) {
+        match Check::get_ilike(Some(20), String::from(query)) {
                Ok(checks) => {
                    match Check::for_serde(checks) {
                        Ok(ref serde_checks) => {
-                           Response::from(serde_json::to_string(serde_checks).unwrap())
+                           Ok(Response::from(serde_json::to_string(serde_checks).unwrap()))
                        }
-                       Err(ref e) => {
-                           Response::from(serde_json::to_string(e.description()).unwrap())
-                       }
+                       Err(_) => Err(PencilError::PenHTTPError(HTTPError::InternalServerError)),
                    }
                }
-               Err(ref e) => Response::from(serde_json::to_string(e.description()).unwrap()),
+               Err(_) => Err(PencilError::PenHTTPError(HTTPError::InternalServerError)),
 
-           })
+           }
     } else {
-        Ok(Response::from("query cannot be empty!"))
+        Err(PencilError::PenHTTPError(HTTPError::BadRequest))
     }
 }
 
@@ -168,13 +159,13 @@ pub fn run(r: &mut Request) -> PencilResult {
             Ok(mut check) => {
                 match check.perform() {
                     Ok(_) => Ok(Response::from("Ok")),
-                    Err(e) => Ok(Response::from(e.description())),
+                    Err(_) => Err(PencilError::PenHTTPError(HTTPError::InternalServerError)),
                 }
             }
-            Err(e) => Ok(Response::from(e.description())),
+            Err(_) => Err(PencilError::PenHTTPError(HTTPError::InternalServerError)),
         }
     } else {
-        Ok(Response::from("id cannot be empty!"))
+       Err(PencilError::PenHTTPError(HTTPError::BadRequest))
     }
 }
 

@@ -7,28 +7,15 @@ extern crate error_chain;
 extern crate url;
 extern crate curl;
 extern crate dotenv;
+extern crate chrono;
 
-use dotenv::dotenv;
-use pencil::{Pencil, Request, Response, PencilResult};
-
-use std::env;
+use pencil::Pencil;
 
 mod check;
 mod user;
 mod session;
 
 // Requires MASTER_KEY, ESPER_URL and DATABASE_URL
-fn key_auth(r: &mut Request) -> Option<PencilResult> {
-    dotenv().ok();
-
-    let master = env::var("MASTER_KEY").expect("MASTER_KEY must be set");
-    let unauth = Some(Ok(Response::from(serde_json::to_string(&json!({"code": 401, "status": "Unauthorized"})).unwrap())));
-    if let Some(key) = r.args().get("key") {
-        if key == master { None } else { unauth }
-    } else {
-        unauth
-    }
-}
 
 fn main() {
     let mut app = Pencil::new("/");
@@ -39,8 +26,8 @@ fn main() {
     app.delete("/v0/check:delete", "check:delete", check::delete);
     app.get("/v0/check:publish", "check:publish", check::publish);
     app.get("/v0/session:validate", "session:validate", session::validate);
-    app.get("/v0/user:login", "user:login", user::login);
-    app.get("/v0/user:register", "user:register", user::register);
-    // app.before_request(key_auth);
+    app.post("/v0/user:login", "user:login", user::login);
+    app.post("/v0/user:register", "user:register", user::register);
+    app.before_request(session::before_each_request);
     app.run("0.0.0.0:5000");
 }
