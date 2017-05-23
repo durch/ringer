@@ -8,6 +8,7 @@ table! {
         last_end -> Nullable<Timestamptz>,
         http_status -> Nullable<Int4>,
         meta -> Nullable<Jsonb>,
+        user_id -> Int4,
     }
 }
 

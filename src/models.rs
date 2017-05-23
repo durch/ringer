@@ -44,7 +44,7 @@ impl User {
 pub struct NewUser {
     pub email: String,
     pub pass: String,
-    pub created: NaiveDateTime
+    pub created: NaiveDateTime,
 }
 
 impl NewUser {
@@ -80,7 +80,7 @@ impl Session {
     }
 
     pub fn is_valid(&self) -> bool {
-        UTC::now().naive_utc() < self.valid_until 
+        UTC::now().naive_utc() < self.valid_until
     }
 
     pub fn delete(&self) -> Result<usize> {
@@ -198,6 +198,14 @@ HasMany! {
     }
 }
 
+HasMany! {
+    (checks, foreign_key = user_id)
+    #[table_name(users)]
+    struct User {
+        id: i32,
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct SerdeCheck {
     pub id: i32,
@@ -245,19 +253,20 @@ pub struct Check {
     pub last_end: Option<NaiveDateTime>,
     pub http_status: Option<i32>,
     pub meta: Option<serde_json::Value>,
+    pub user_id: i32
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct CheckMeta {
     pub checkers: Vec<String>,
-    state: Option<String>
+    state: Option<String>,
 }
 
 impl Default for CheckMeta {
     fn default() -> Self {
         CheckMeta {
-            checkers: vec!(String::from("alert_on_error_code")),
-            state: None
+            checkers: vec![String::from("alert_on_error_code")],
+            state: None,
         }
     }
 }
@@ -367,7 +376,7 @@ impl Check {
         }
         let mut meta: CheckMeta = serde_json::from_value(self.meta.to_owned().unwrap_or_default())?;
         self.u_last_end(UTC::now().naive_utc())?;
-        meta.state = Some(String::from_utf8(dst)?); 
+        meta.state = Some(String::from_utf8(dst)?);
         self.u_meta(meta)?;
         self.u_http_status(easy.response_code()?)?;
         let checkrun = NewCheckRun::from(self);
@@ -403,6 +412,7 @@ impl From<NewCheck> for Check {
             http_status: None,
             last_start: None,
             last_end: None,
+            user_id: newcheck.user_id
         }
     }
 }
@@ -412,6 +422,7 @@ impl From<NewCheck> for Check {
 pub struct NewCheck {
     pub url: String,
     pub rate: i32,
+    pub user_id: i32
 }
 
 impl NewCheck {

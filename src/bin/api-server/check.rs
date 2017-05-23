@@ -7,8 +7,6 @@ use pencil::{Request, Response, PencilResult, PencilError, HTTPError};
 use serde_json;
 use std::env;
 
-use std::error::Error;
-
 use url::Url;
 
 fn format_sse(payload: &str) -> String {
@@ -89,6 +87,15 @@ fn newcheck_from_request(r: &mut Request) -> Result<NewCheck> {
                        }
                    } else {
                        bail!("rate is mandatory!")
+                   },
+                   user_id: if let Some(user_id) = obj.get("user") {
+                       if let Some(x) = user_id.as_str() {
+                           x.parse()?
+                       } else {
+                           bail!("user_id needs to be an integer!")
+                       }
+                   } else {
+                       bail!("user_id is mandatory!")
                    },
                }
            } else {
