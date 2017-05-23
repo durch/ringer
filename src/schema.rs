@@ -7,7 +7,7 @@ table! {
         last_start -> Nullable<Timestamptz>,
         last_end -> Nullable<Timestamptz>,
         http_status -> Nullable<Int4>,
-        state -> Nullable<Text>,
+        meta -> Nullable<Jsonb>,
     }
 }
 

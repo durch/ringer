@@ -1,0 +1,2 @@
+ALTER TABLE checks DROP COLUMN meta;
+ALTER TABLE checks ADD COLUMN state TEXT;

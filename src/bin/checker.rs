@@ -4,13 +4,14 @@ extern crate curl;
 extern crate futures;
 extern crate futures_cpupool;
 extern crate dotenv;
+extern crate serde_json;
 use std::env;
 
 use futures::future;
 use futures_cpupool::CpuPool;
 
 use std::{thread, time};
-use ringer::models::Check;
+use ringer::models::{Check, CheckMeta};
 use ringer::error::{Result, Error};
 use ringer::utils::alert_on_error_code;
 use curl::easy::Easy;
@@ -26,11 +27,15 @@ fn min_rate(checks: &[Check]) -> u64 {
         .fold(60, |s, x| if s < x.rate { s } else { x.rate }) as u64
 }
 
-fn async_check<F>(check: &mut Check, funs: &[F]) -> future::FutureResult<(), Error>
-    where F: Fn(&mut Check) -> Result<()>
-{
+fn async_check(check: &mut Check) -> future::FutureResult<(), Error> {
     if check.conditional_perform().unwrap() {
-        for fun in funs {
+        let meta: CheckMeta = serde_json::from_value(check.meta.to_owned().unwrap_or_default())
+            .unwrap();
+        for checker in meta.checkers {
+            let fun = match checker.as_ref() {
+                "alert_on_error_code" => alert_on_error_code,
+                _ => unreachable!()
+            };  
             match fun(check) {
                 Ok(_) => {}
                 Err(e) => return future::err(e),
@@ -40,11 +45,9 @@ fn async_check<F>(check: &mut Check, funs: &[F]) -> future::FutureResult<(), Err
     future::ok(())
 }
 
-fn run<F>(funs: &[F]) -> Result<()>
-    where F: Fn(&mut Check) -> Result<()>
-{
+fn run() -> Result<()> {
     let cpu_pool = CpuPool::new(10);
-    
+
     let mut checks;
     let mut idle_time: u64;
     let mut start;
@@ -60,10 +63,10 @@ fn run<F>(funs: &[F]) -> Result<()>
         let mut futures = Vec::new();
         // Test if this is truly async :)
         for mut check in checks {
-            let future = cpu_pool.spawn(async_check(&mut check, funs));
+            let future = cpu_pool.spawn(async_check(&mut check));
             futures.push(future);
         }
-        
+
         ticks = idle_time / publish_interval;
         now = UTC::now().naive_utc();
         println!("{} - Performing {}/{} checks", now, futures.len(), l);
@@ -74,9 +77,9 @@ fn run<F>(funs: &[F]) -> Result<()>
         for _ in 0..ticks {
             // println!("{}", UTC::now());
             trigger_sse()?;
-            thread::sleep(time::Duration::from_secs(publish_interval));    
+            thread::sleep(time::Duration::from_secs(publish_interval));
         }
-        
+
     }
 }
 
@@ -104,5 +107,5 @@ fn trigger_sse() -> Result<u32> {
 }
 
 fn main() {
-    run(&[alert_on_error_code]).unwrap();
+    run().unwrap();
 }

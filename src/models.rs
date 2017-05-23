@@ -6,6 +6,7 @@ use diesel::SaveChangesDsl;
 use error::Result;
 use utils::{hash, process_pass};
 use time::Duration;
+use serde_json;
 
 use utils::establish_connection;
 use curl::easy::Easy;
@@ -243,7 +244,22 @@ pub struct Check {
     pub last_start: Option<NaiveDateTime>,
     pub last_end: Option<NaiveDateTime>,
     pub http_status: Option<i32>,
-    pub state: Option<String>,
+    pub meta: Option<serde_json::Value>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CheckMeta {
+    pub checkers: Vec<String>,
+    state: Option<String>
+}
+
+impl Default for CheckMeta {
+    fn default() -> Self {
+        CheckMeta {
+            checkers: vec!(String::from("alert_on_error_code")),
+            state: None
+        }
+    }
 }
 
 impl Check {
@@ -294,8 +310,8 @@ impl Check {
         Ok(checks.iter().map(|x| x.into()).collect())
     }
 
-    pub fn u_state(&mut self, new_state: String) -> Result<Self> {
-        self.state = Some(new_state);
+    pub fn u_meta(&mut self, new_meta: CheckMeta) -> Result<Self> {
+        self.meta = Some(serde_json::to_value(new_meta)?);
         Ok(self.save_changes::<Self>(&establish_connection())?)
     }
 
@@ -349,8 +365,10 @@ impl Check {
                                 })?;
             transfer.perform()?;
         }
+        let mut meta: CheckMeta = serde_json::from_value(self.meta.to_owned().unwrap_or_default())?;
         self.u_last_end(UTC::now().naive_utc())?;
-        self.u_state(String::from_utf8(dst)?)?;
+        meta.state = Some(String::from_utf8(dst)?); 
+        self.u_meta(meta)?;
         self.u_http_status(easy.response_code()?)?;
         let checkrun = NewCheckRun::from(self);
         checkrun.insert()?;
@@ -381,7 +399,7 @@ impl From<NewCheck> for Check {
             id: 0,
             url: newcheck.url,
             rate: newcheck.rate,
-            state: None,
+            meta: Some(serde_json::to_value(CheckMeta::default()).unwrap()),
             http_status: None,
             last_start: None,
             last_end: None,
