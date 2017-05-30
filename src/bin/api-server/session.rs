@@ -3,6 +3,12 @@ use serde_json;
 use pencil::{Request, Response, PencilResult, PencilError, HTTPError};
 
 pub fn before_each_request(r: &mut Request) -> Option<PencilResult> {
+    if r.endpoint() == Some(String::from("user:login")) {
+        return None
+    }
+    if r.endpoint() == Some(String::from("user:register")) {
+        return None
+    }
     if let Some(session_id) = r.args().get::<String>("session_id") {
         match Session::get_by_ext_id(session_id) {
             Ok(session) => {
@@ -13,7 +19,7 @@ pub fn before_each_request(r: &mut Request) -> Option<PencilResult> {
                     Some(Err(PencilError::PenHTTPError(HTTPError::Forbidden)))
                 }
             }
-            Err(_) => Some(Err(PencilError::PenHTTPError(HTTPError::InternalServerError))),
+            Err(_) => Some(Err(PencilError::PenHTTPError(HTTPError::Forbidden))),
         }
 
     } else {
