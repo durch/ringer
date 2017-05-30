@@ -8,16 +8,37 @@ extern crate url;
 extern crate curl;
 extern crate dotenv;
 extern crate chrono;
+extern crate rand;
+#[macro_use]
+extern crate lazy_static;
 
 use pencil::Pencil;
+use std::sync::RwLock;
+use std::env;
+use dotenv::dotenv;
 
 mod check;
 mod user;
 mod session;
 
+use user::generate_invite_codes;
+
+lazy_static! {
+    pub static ref INVITE_CODES: RwLock<Vec<String>> = RwLock::new(vec![]);
+}
+
 // Requires MASTER_KEY, ESPER_URL and DATABASE_URL
 
+
 fn main() {
+    dotenv().ok();
+
+    let n_codes: usize = match env::var("CODES") {
+        Ok(codes) => codes.parse().expect("CODES must be integer"),
+        Err(_) => 100
+    };
+
+    generate_invite_codes(n_codes).unwrap();
     let mut app = Pencil::new("/");
     app.set_debug(true);
     app.get("/v0/check:list", "check:list", check::list);

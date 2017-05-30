@@ -29,9 +29,12 @@ hyper = "*"
 unicase = "*"
 url = "*"
 pwhash = "*"
+rand = "*"
 
 serde = "*"
 serde_json = "*"
 serde_derive = "*"
 futures = "*"
 futures-cpupool = "*"
+
+lazy_static = "*"

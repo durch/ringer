@@ -31,6 +31,7 @@ pub mod error {
             Json(::serde_json::Error);
             ToInt(::std::num::ParseIntError);
             PwHash(::pwhash::error::Error);
+            // Poison(::std::sync::PoisonError);
         }
     }
 }

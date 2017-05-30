@@ -3,6 +3,22 @@ use ringer::models::{Session, User, NewUser};
 use ringer::utils::verify_pass;
 use pencil::{Request, Response, PencilResult, PencilError, HTTPError};
 use chrono::prelude::*;
+use rand::{thread_rng, Rng};
+use std::io::{self, Write};
+use super::INVITE_CODES;
+
+
+pub fn generate_invite_codes(n: usize) -> Result<()> {
+    let mut codes = INVITE_CODES.write().unwrap();
+    let mut rng = thread_rng();
+    for _ in 0..n {
+        let s = rng.gen_ascii_chars().take(10).collect::<String>();
+        let _ = io::stdout().write(s.as_bytes());
+        let _ = io::stdout().write(b"\n");
+        codes.push(s);
+    }
+    Ok(())
+}
 
 fn newuser_from_request(r: &mut Request) -> Result<NewUser> {
     Ok(if let Some(ref value) = *r.get_json() {
@@ -65,6 +81,16 @@ pub fn register(r: &mut Request) -> PencilResult {
                 // If a user exists, we return error, since this is register
                 Ok(_) => Err(PencilError::PenHTTPError(HTTPError::Conflict)),
                 Err(_) => {
+                    if let Some(invite_code) = r.args().get::<String>("invite_code") {
+                        let codes = INVITE_CODES.read().unwrap();
+                        match codes.binary_search(invite_code) {
+                            Ok(i) => {
+                                let mut w_codes = INVITE_CODES.write().unwrap();
+                                w_codes.swap_remove(i);
+                            }
+                            Err(_) => return Err(PencilError::PenHTTPError(HTTPError::Forbidden)),
+                        }
+                    }
                     newuser.insert().unwrap();
                     Ok(Response::from("Ok"))
                 }
