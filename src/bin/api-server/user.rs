@@ -58,7 +58,7 @@ pub fn login(r: &mut Request) -> PencilResult {
             match User::exists(&newuser.email) {
                 Ok(user) => {
                     if verify_pass(&newuser.pass, &user.pass) {
-                        match Session::return_fresh_id() {
+                        match Session::return_fresh_id(user.id) {
                             Ok(id) => Ok(Response::from(id)),
                             Err(_) => Err(PencilError::PenHTTPError(HTTPError::Forbidden)),
                         }

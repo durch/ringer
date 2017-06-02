@@ -28,6 +28,7 @@ table! {
         id -> Int4,
         ext_id -> Text,
         valid_until -> Timestamptz,
+        user_id -> Int4,
     }
 }
 

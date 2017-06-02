@@ -14,7 +14,7 @@ fn format_sse(payload: &str) -> String {
 }
 
 pub fn list(_: &mut Request) -> PencilResult {
-    match Check::get_all(Some(20)) {
+    match Check::get_all(Some(20), None) {
         Ok(checks) => {
             match Check::for_serde(checks) {
                 Ok(ref serde_checks) => {
@@ -47,22 +47,28 @@ fn _publish(data: &str) -> Result<u32> {
     Ok(easy.response_code()?)
 }
 
-pub fn publish(_: &mut Request) -> PencilResult {
-    match Check::get_all(Some(20)) {
-        Ok(checks) => {
-            match Check::for_serde(checks) {
-                Ok(ref serde_checks) => {
-                    let payload = serde_json::to_string(serde_checks).unwrap();
-                    match _publish(&format_sse(&payload)) {
-                        Ok(code) => Ok(Response::from(serde_json::to_string(&json!({"code": code, "status": "published"}))
+pub fn publish(r: &mut Request) -> PencilResult {
+    if let Some(user_id) = r.args().get::<String>("user_id") {
+        match Check::get_all(Some(20), Some(user_id.parse().unwrap())) {
+            Ok(checks) => {
+                match Check::for_serde(checks) {
+                    Ok(ref serde_checks) => {
+                        let payload = serde_json::to_string(serde_checks).unwrap();
+                        match _publish(&format_sse(&payload)) {
+                            Ok(code) => Ok(Response::from(serde_json::to_string(&json!({"code": code, "status": "published"}))
                                    .unwrap())),
-                        Err(_) => Err(PencilError::PenHTTPError(HTTPError::InternalServerError)),
+                            Err(_) => {
+                                Err(PencilError::PenHTTPError(HTTPError::InternalServerError))
+                            }
+                        }
                     }
+                    Err(_) => Err(PencilError::PenHTTPError(HTTPError::InternalServerError)),
                 }
-                Err(_) => Err(PencilError::PenHTTPError(HTTPError::InternalServerError)),
-            }
+            } 
+            Err(_) => Err(PencilError::PenHTTPError(HTTPError::InternalServerError)),
         }
-        Err(_) => Err(PencilError::PenHTTPError(HTTPError::InternalServerError)),
+    } else {
+        return Err(PencilError::PenHTTPError(HTTPError::BadRequest))
     }
 }
 
@@ -132,7 +138,7 @@ pub fn delete(r: &mut Request) -> PencilResult {
                     Err(_) => Err(PencilError::PenHTTPError(HTTPError::InternalServerError)),
                 }
             }
-            Err(_) => Err(PencilError::PenHTTPError(HTTPError::BadRequest))
+            Err(_) => Err(PencilError::PenHTTPError(HTTPError::BadRequest)),
         }
     } else {
         Err(PencilError::PenHTTPError(HTTPError::BadRequest))
@@ -143,17 +149,17 @@ pub fn find(r: &mut Request) -> PencilResult {
     if let Some(query) = r.args().get("query") {
         let query: &str = query;
         match Check::get_ilike(Some(20), String::from(query)) {
-               Ok(checks) => {
-                   match Check::for_serde(checks) {
-                       Ok(ref serde_checks) => {
-                           Ok(Response::from(serde_json::to_string(serde_checks).unwrap()))
-                       }
-                       Err(_) => Err(PencilError::PenHTTPError(HTTPError::InternalServerError)),
-                   }
-               }
-               Err(_) => Err(PencilError::PenHTTPError(HTTPError::InternalServerError)),
+            Ok(checks) => {
+                match Check::for_serde(checks) {
+                    Ok(ref serde_checks) => {
+                        Ok(Response::from(serde_json::to_string(serde_checks).unwrap()))
+                    }
+                    Err(_) => Err(PencilError::PenHTTPError(HTTPError::InternalServerError)),
+                }
+            }
+            Err(_) => Err(PencilError::PenHTTPError(HTTPError::InternalServerError)),
 
-           }
+        }
     } else {
         Err(PencilError::PenHTTPError(HTTPError::BadRequest))
     }
@@ -172,7 +178,7 @@ pub fn run(r: &mut Request) -> PencilResult {
             Err(_) => Err(PencilError::PenHTTPError(HTTPError::InternalServerError)),
         }
     } else {
-       Err(PencilError::PenHTTPError(HTTPError::BadRequest))
+        Err(PencilError::PenHTTPError(HTTPError::BadRequest))
     }
 }
 

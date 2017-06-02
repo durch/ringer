@@ -26,6 +26,10 @@ pub struct User {
 }
 
 impl User {
+    pub fn get_all() -> Result<Vec<Self>> {
+        Ok(users::table.load(&establish_connection())?)
+    }
+
     pub fn get_by_email(email: &str) -> Result<Self> {
         Ok(users::table
                .filter(users::email.eq(email))
@@ -70,6 +74,7 @@ pub struct Session {
     pub id: i32,
     pub ext_id: String,
     pub valid_until: NaiveDateTime,
+    pub user_id: i32,
 }
 
 impl Session {
@@ -87,8 +92,8 @@ impl Session {
         Ok(diesel::delete(self).execute(&establish_connection())?)
     }
 
-    pub fn return_fresh_id() -> Result<String> {
-        Ok(NewSession::new()?.insert()?.ext_id)
+    pub fn return_fresh_id(user_id: i32) -> Result<String> {
+        Ok(NewSession::new(user_id)?.insert()?.ext_id)
     }
 }
 
@@ -97,16 +102,18 @@ impl Session {
 pub struct NewSession {
     pub ext_id: String,
     pub valid_until: NaiveDateTime,
+    pub user_id: i32,
 }
 
 impl NewSession {
-    pub fn new() -> Result<Self> {
+    pub fn new(user_id: i32) -> Result<Self> {
         dotenv().ok();
         let pepper = env::var("PEPPER").expect("PEPPER must be set");
         let timestamp = UTC::now().naive_utc().timestamp();
         Ok(NewSession {
                ext_id: format!("x{}", hash(&format!("{}{}", timestamp, pepper))),
                valid_until: UTC::now().naive_utc() + Duration::hours(1),
+               user_id: user_id,
            })
     }
 
@@ -206,6 +213,15 @@ HasMany! {
     }
 }
 
+HasMany! {
+    (sessions, foreign_key = user_id)
+    #[table_name(users)]
+    struct User {
+        id: i32,
+    }
+}
+
+
 #[derive(Serialize, Deserialize)]
 pub struct SerdeCheck {
     pub id: i32,
@@ -253,7 +269,7 @@ pub struct Check {
     pub last_end: Option<NaiveDateTime>,
     pub http_status: Option<i32>,
     pub meta: Option<serde_json::Value>,
-    pub user_id: i32
+    pub user_id: i32,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -296,20 +312,44 @@ impl Check {
         }
     }
 
-    pub fn get_all(limit: Option<i64>) -> Result<Vec<Self>> {
+    pub fn get_all(limit: Option<i64>, user_id: Option<i32>) -> Result<Vec<Self>> {
         match limit {
             Some(l) => {
-                Ok(checks::table
-                       .order(checks::http_status.desc())
-                       .order(checks::id)
-                       .limit(l)
-                       .load(&establish_connection())?)
+                match user_id {
+                    Some(u) => {
+                        Ok(checks::table
+                               .filter(checks::user_id.eq(u))
+                               .order(checks::http_status.desc())
+                               .order(checks::id)
+                               .limit(l)
+                               .load(&establish_connection())?)
+                    }
+                    None => {
+                        Ok(checks::table
+                               .order(checks::http_status.desc())
+                               .order(checks::id)
+                               .limit(l)
+                               .load(&establish_connection())?)
+                    }
+
+                }
             }
             None => {
-                Ok(checks::table
-                       .order(checks::http_status.desc())
-                       .order(checks::id)
-                       .load(&establish_connection())?)
+                match user_id {
+                    Some(u) => {
+                        Ok(checks::table
+                               .filter(checks::user_id.eq(u))
+                               .order(checks::http_status.desc())
+                               .order(checks::id)
+                               .load(&establish_connection())?)
+                    }
+                    None => {
+                        Ok(checks::table
+                               .order(checks::http_status.desc())
+                               .order(checks::id)
+                               .load(&establish_connection())?)
+                    }
+                }
             }
         }
     }
@@ -412,7 +452,7 @@ impl From<NewCheck> for Check {
             http_status: None,
             last_start: None,
             last_end: None,
-            user_id: newcheck.user_id
+            user_id: newcheck.user_id,
         }
     }
 }
@@ -422,7 +462,7 @@ impl From<NewCheck> for Check {
 pub struct NewCheck {
     pub url: String,
     pub rate: i32,
-    pub user_id: i32
+    pub user_id: i32,
 }
 
 impl NewCheck {
